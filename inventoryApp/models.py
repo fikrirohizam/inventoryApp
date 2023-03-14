@@ -1,12 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
-import json
-
-class Object:
-    def toJSON(self):
-        return json.dumps(self, default=lambda o: o.__dict__, 
-            sort_keys=True, indent=4)
 # Create your models here.
 class User(AbstractUser):
     user_id = models.AutoField(primary_key=True)
@@ -37,7 +31,6 @@ class Store(models.Model):
     store_id = models.AutoField(primary_key=True)
     store_name = models.CharField(max_length=100)
     user = models.ForeignKey(User,related_name='user_store',on_delete=models.CASCADE)
-    material_stocks = models.ForeignKey('MaterialStock',related_name='stock_stores',on_delete=models.CASCADE)
     products = models.ManyToManyField(Product,related_name='product_stores')
     def __str__(self):
         return self.store_name
@@ -47,7 +40,13 @@ class MaterialStock(models.Model):
     material = models.ForeignKey(Material,related_name='materials',on_delete=models.CASCADE, null=True)
     max_capacity =  models.IntegerField()
     current_capacity =  models.IntegerField()
+    @property
+    def percentage_of_capacity(self):
+        percent = (100 * self.current_capacity/self.max_capacity)
+        return float("%.2f" % percent)
+    def __str__(self):
+        s = self.store.store_name
+        c = self.current_capacity
+        m = self.max_capacity
+        return ("%s %s/%s" % (s,c,m))
 
-
-
-    

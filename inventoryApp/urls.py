@@ -14,5 +14,7 @@ urlpatterns = [
 # Django rest framework project
     path('', include(router.urls), name='rest_index'),
     path('restock/', views.restock),
+    path('inventory/', views.inventory),
+    path('product-capacity/', views.product_capacity),
 
 ]
