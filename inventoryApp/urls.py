@@ -9,12 +9,19 @@ from rest_framework.urlpatterns import format_suffix_patterns
 router = routers.DefaultRouter()
 router.register(r'materials', views.MaterialViewSet, basename='materials')
 
+
 urlpatterns = [
 
 # Django rest framework project
     path('', include(router.urls), name='rest_index'),
-    path('restock/', views.restock),
-    path('inventory/', views.inventory),
-    path('product-capacity/', views.product_capacity),
+    path('api-token-auth/', views.CustomAuthToken.as_view()),
+    path('api/login', views.login, name='login'),
+    path('restock/', views.restock, name='restock'),
+    path('inventory/', views.inventory, name='inventory'),
+    path('product-capacity/', views.product_capacity, name='product_capacity'),
+    path('sales/', views.sales, name='sales'),
+    path('material-stocks/', views.MaterialStockListAPIView.as_view(), name='material_stocks'),
+    path('material-stocks/<int:pk>', views.MaterialStockDetailAPIView.as_view(), name='material_stocks_detail'),
+    path('products/', views.ProductListAPIView.as_view(), name='products'),
 
 ]

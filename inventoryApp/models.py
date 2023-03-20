@@ -14,7 +14,7 @@ class Material(models.Model):
     
 class MaterialQuantity(models.Model):
     quantity = models.IntegerField()
-    ingredient = models.ForeignKey(Material,related_name='quantities',on_delete=models.CASCADE, null=True)
+    ingredient = models.ForeignKey(Material,related_name='quantities',on_delete=models.CASCADE)
     def __str__(self):
         return f'{self.ingredient.name} ({self.quantity})'
     @property
@@ -44,6 +44,7 @@ class MaterialStock(models.Model):
     def percentage_of_capacity(self):
         percent = (100 * self.current_capacity/self.max_capacity)
         return float("%.2f" % percent)
+    
     def __str__(self):
         s = self.store.store_name
         c = self.current_capacity
