@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.forms import ValidationError
 
 # Create your models here.
 class User(AbstractUser):
@@ -50,4 +51,14 @@ class MaterialStock(models.Model):
         c = self.current_capacity
         m = self.max_capacity
         return ("%s %s/%s" % (s,c,m))
+    class Meta:
+        unique_together = (('store', 'material'),)
+
+    def clean(self):
+        if self.current_capacity > self.max_capacity:
+            raise ValidationError("Current capacity cannot be higher than max capacity")
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
