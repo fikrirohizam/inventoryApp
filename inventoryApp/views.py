@@ -280,14 +280,15 @@ def restocks(request):
             if added_quantity == 0:
                 continue
             material_stock.current_capacity = material_stock.max_capacity
-            material_stock.save()
+            material_stock.save(update_fields=['current_capacity'])
             material = material_stock.material
-            overall_price += added_quantity * material.price
+            total_price = added_quantity * material.price
+            overall_price += total_price
             response_data['materials'].append({
                 'material': material.pk,
                 'quantity': added_quantity,
                 'current_capacity': material_stock.current_capacity,
-                'total_price': added_quantity * material.price,
+                'total_price': total_price,
             })
             response_data['overall_price'] = overall_price
     
@@ -300,19 +301,24 @@ def restocks(request):
             for material_data in serializer.validated_data:
                 material_id = material_data['material']
                 added_quantity = material_data['quantity']
-                material_stock = MaterialStock.objects.get(store=current_store, material=material_id)
+                material_stock = MaterialStock.objects.filter(store=current_store, material=material_id).first()
+
+                if material_stock is None:
+                    return Response({'error': 'Material stock not found.'}, status=status.HTTP_404_NOT_FOUND)
+                
                 new_capacity = material_stock.current_capacity + added_quantity
                 if new_capacity > material_stock.max_capacity:
                     return Response({'error': 'Adding this amount would exceed maximum capacity.'}, status=status.HTTP_400_BAD_REQUEST)
                 material_stock.current_capacity = new_capacity
                 material = material_stock.material
-                material_stock.save()
-                overall_price += added_quantity * material.price
+                material_stock.save(update_fields=['current_capacity'])
+                total_price = added_quantity * material.price
+                overall_price += total_price
                 response_data['materials'].append({
                     'material': material_id,
                     'quantity': added_quantity,
                     'current_capacity': material_stock.current_capacity,
-                    'total_price': added_quantity * material.price,
+                    'total_price': total_price,
                 })
             response_data['overall_price'] = overall_price
         else:
