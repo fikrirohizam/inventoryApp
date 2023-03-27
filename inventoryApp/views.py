@@ -3,8 +3,8 @@ from .models import Material, MaterialStock, Store, Product
 from .serializers import ProductSerializer,RestocksSerializer,UserSigninSerializer,ProductCapacitySerializer,RestockGetSerializer,RestockPostSerializer,SalesSerializer, InventorySerializer,MaterialStockSerializer
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework import generics
+from django.views import generic
 from rest_framework import status
-from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from .authentication import token_expire_handler, expires_in
@@ -185,7 +185,6 @@ class MaterialStockListAPIView(generics.ListCreateAPIView):
         max_cap = request.data.get('max_capacity')
         if current_store is not None and material is not None:
             existing_material_stock = MaterialStock.objects.filter(store=current_store, material=material).first()
-            print(existing_material_stock)
             if existing_material_stock:
                 return Response({'error': "This material stock already exists in this store. Please use other material or update existing stock."}, status= status.HTTP_400_BAD_REQUEST)
             elif max_cap < current_cap:
@@ -366,11 +365,3 @@ def multisales(request):
 
 
 
-
-# Testing same restock view using modelviewset
-class MaterialViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint that allows material to be viewed or edited.
-    """
-    queryset = Material.objects.all()
-    serializer_class = RestockGetSerializer

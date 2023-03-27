@@ -31,16 +31,14 @@ class ProductListAPIViewTestCase(APITestCase):
 
     def test_delete_product_from_store(self):
         self.authenticate()
-        data = {'id': self.product.id}
+        data = {'product_id': self.product.id}
         response = self.client.delete(self.url, data)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(self.store.products.filter(id=self.product.id).exists())
 
     def test_serialized_product_data(self):
         self.authenticate()
         serializer_data = ProductSerializer(instance=self.product).data
-        print('ddd',serializer_data)
-
         self.assertEqual(serializer_data['name'], self.product.name)
         self.assertEqual(len(serializer_data['material_quantity']), 1)
         self.assertEqual(serializer_data['material_quantity'][0]['quantity'], self.material_quantity.quantity)

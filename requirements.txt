@@ -3,4 +3,4 @@ djangorestframework==3.14.0
 Pygments==2.11.2
 psycopg2>=2.8
 django-extensions
-
+django_rename_app

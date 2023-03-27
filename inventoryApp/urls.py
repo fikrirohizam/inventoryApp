@@ -7,7 +7,6 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 
 router = routers.DefaultRouter()
-router.register(r'materials', views.MaterialViewSet, basename='materials')
 
 
 urlpatterns = [
