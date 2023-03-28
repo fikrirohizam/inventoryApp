@@ -1,0 +1,28 @@
+{% load static %}
+<link rel="stylesheet" href="{% static 'inventoryApp/style.css' %}">
+
+<h1>{{ store.store_name }} Products</h1>
+
+<ul>
+{% for product in products %}
+  <li>{{ product.name }}
+    <form method="POST" action="{% url 'delete_product' store_id=store.pk product_id=product.pk %}">
+      {% csrf_token %}
+      <input type="submit" value="Delete">
+    </form>
+  </li>
+{% empty %}
+  <li>No products found.</li>
+{% endfor %}
+</ul>
+
+<form method="POST" action="{% url 'add_product' store_id=store.pk %}">
+  {% csrf_token %}
+  <label for="product">Product:</label>
+  <select name="product" id="product">
+    {% for product in available_products %}
+      <option value="{{ product.pk }}">{{ product.name }}</option>
+    {% endfor %}
+  </select>
+  <input type="submit" value="Add">
+</form>

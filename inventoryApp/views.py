@@ -1,4 +1,5 @@
-from rest_framework import viewsets 
+from django.shortcuts import get_object_or_404, redirect, render
+from inventoryApp import forms
 from .models import Material, MaterialStock, Store, Product
 from .serializers import ProductSerializer,RestocksSerializer,UserSigninSerializer,ProductCapacitySerializer,RestockGetSerializer,RestockPostSerializer,SalesSerializer, InventorySerializer,MaterialStockSerializer
 from rest_framework.authtoken.views import ObtainAuthToken
@@ -9,6 +10,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from .authentication import token_expire_handler, expires_in
 from rest_framework.authtoken.models import Token
+from django.contrib import messages
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.views.decorators.csrf import csrf_exempt
@@ -159,10 +161,10 @@ def sales(request):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class MaterialStockListAPIView(generics.ListCreateAPIView):
-    
+
     def get_queryset(self):
         current_store = Store.objects.filter(user__username=self.request.user).first()
-        queryset = MaterialStock.objects.filter(store=current_store)
+        queryset = MaterialStock.objects.filter(store=current_store).order_by('pk')
         return queryset
 
     def get_serializer_class(self):
@@ -218,7 +220,7 @@ class ProductListAPIView(generics.ListAPIView):
 
     def get_queryset(self):
         current_store = Store.objects.filter(user__username=self.request.user).first()
-        queryset = Product.objects.filter(product_stores=current_store)
+        queryset = Product.objects.filter(product_stores=current_store).order_by('pk')
         return queryset
         
     def post(self, request):
@@ -237,8 +239,7 @@ class ProductListAPIView(generics.ListAPIView):
             current_store.products.add(product)
             serializer = ProductSerializer(product)
             return Response({"success": "Product has been assigned to this store", "product":serializer.data},status=status.HTTP_200_OK)
-        
-           
+    
     """ 
     def create(self, request):
         current_store = Store.objects.filter(user__username=self.request.user).first()
@@ -358,10 +359,42 @@ def multisales(request):
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+#///////////////////////////////////////////////////////////////
+#----------------HTML VIEW---------------------------------------
 
+def store_products(request, store_id):
+    store = get_object_or_404(Store, pk=store_id)
+    products = store.products.all()
+    available_products = Product.objects.exclude(product_stores=store)
+    return render(request, 'store_products.html', {
+        'store': store,
+        'products': products,
+        'available_products': available_products,
+    })
 
+def add_product(request, store_id):
+    store = get_object_or_404(Store, pk=store_id)
+    if request.method == 'POST':
+        form = forms.AddProductForm(request.POST)
+        if form.is_valid():
+            product = form.cleaned_data['product']
+            store.products.add(product)
+            return redirect('store_products', store_id=store_id)
+    else:
+        form = forms.AddProductForm()
+    return render("whoa you failed to add")
 
-
+def delete_product(request, store_id, product_id):
+    store = get_object_or_404(Store, pk=store_id)
+    product = get_object_or_404(Product, pk=product_id, product_stores=store)
+    if request.method == 'POST':
+        form = forms.DeleteProductForm(request.POST)
+        if form.is_valid():
+            store.products.remove(product)
+            return redirect('store_products', store_id=store_id)
+    else:
+        form = forms.DeleteProductForm()
+    return render("whoa you failed to delete")
 
 
 

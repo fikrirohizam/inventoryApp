@@ -1,0 +1,51 @@
+/* Set the font family and color of the headings */
+h1 {
+    font-family: Arial, sans-serif;
+    color: #333;
+  }
+  
+  /* Style the unordered list */
+  ul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* Add some spacing between the list items */
+  li {
+    margin-bottom: 10px;
+  }
+  
+  /* Style the delete button */
+  input[type="submit"] {
+    background-color: #630d0d;
+    color: #fff;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  /* Style the add product form */
+  label {
+    display: inline-block;
+    margin-right: 10px;
+    font-weight: bold;
+  }
+  
+  select {
+    padding: 5px;
+    border-radius: 5px;
+  }
+  
+  /* Style the add button */
+  input[type="submit"][value="Add"] {
+    background-color: #115d20;
+    color: #fff;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  
