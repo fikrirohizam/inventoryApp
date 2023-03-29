@@ -3,18 +3,37 @@
 
 <h1>{{ store.store_name }} Products</h1>
 
-<ul>
-{% for product in products %}
-  <li>{{ product.name }}
-    <form method="POST" action="{% url 'delete_product' store_id=store.pk product_id=product.pk %}">
-      {% csrf_token %}
-      <input type="submit" value="Delete">
-    </form>
-  </li>
-{% empty %}
-  <li>No products found.</li>
-{% endfor %}
-</ul>
+<table class="table">
+  <thead>
+    <tr>
+      <th>Products</th>
+      <th>Material Quantity</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for product in products %}
+    <tr>
+      <td>{{ product.name }}</td>
+      <td>{% for material_quantity in product.material_quantity.all %}
+        {{ material_quantity.ingredient.name }}({{ material_quantity.quantity }})<br>
+        {% endfor %}</td>
+      <td>
+        <form method="POST" action="{% url 'delete_product' store_id=store.pk product_id=product.pk %}">
+          {% csrf_token %}
+          <input type="submit" value="Delete">
+        </form>
+      </td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="4">No products found.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+
 
 <form method="POST" action="{% url 'add_product' store_id=store.pk %}">
   {% csrf_token %}
