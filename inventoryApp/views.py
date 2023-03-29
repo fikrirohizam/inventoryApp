@@ -240,17 +240,7 @@ class ProductListAPIView(generics.ListAPIView):
             current_store.products.add(product)
             serializer = ProductSerializer(product)
             return Response({"success": "Product has been assigned to this store", "product":serializer.data},status=status.HTTP_200_OK)
-    
-    """ 
-    def create(self, request):
-        current_store = Store.objects.filter(user__username=self.request.user).first()
-        serializer = ProductSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(store=current_store)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    """
+
     def delete(self, request):
         current_store = Store.objects.filter(user__username=self.request.user).first()
 
@@ -267,6 +257,20 @@ class ProductListAPIView(generics.ListAPIView):
             return Response({"success": "Product has been removed from store"},status=status.HTTP_200_OK)
         except Store.DoesNotExist:
             return Response({"error": "This product is not available in this store."},status=status.HTTP_204_NO_CONTENT)
+    
+    """ 
+    # This part lets user create new product.
+    # From the requirements, user should not be able to create new product. 
+    # Only can assign existing Product to the current Store.
+    def create(self, request):
+        current_store = Store.objects.filter(user__username=self.request.user).first()
+        serializer = ProductSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(store=current_store)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    """
 
 # Allow multiple material restocking in a single JSON POST request using dict list
 @api_view(['POST'])
@@ -330,35 +334,24 @@ def restocks(request):
 # Allow multiple product sales in a single JSON POST request using dict list
 @api_view(['POST'])
 def multisales(request):
-    if request.method == 'POST':
-        current_store = Store.objects.filter(user__username=request.user).first()
-        serializer = SalesSerializer(data=request.data['sales'], context={'store':current_store}, many=True)
-        if serializer.is_valid():
-            # Loop through each product and subtract the required material from the stock
-            for sale in serializer.validated_data:
-                product_id = sale['product_id']
-                quantity = sale['quantity']
-                try:
-                    product = Product.objects.get(id=product_id)
-                except (Product.DoesNotExist):
-                    return Response({'error': 'Invalid product id'}, status=status.HTTP_400_BAD_REQUEST)
+    current_store = Store.objects.filter(user__username=request.user).first()
+    serializer = SalesSerializer(data=request.data['sales'], context={'store':current_store}, many=True)
 
-                for material_quantity in product.material_quantity.all():
-                    material = material_quantity.ingredient
-                    try:
-                        stock = MaterialStock.objects.get(store=current_store, material=material)
-                    except MaterialStock.DoesNotExist:
-                        return Response({'error': 'Store does not have the required material in stock'}, status=status.HTTP_400_BAD_REQUEST)
-                    else:
-                        if stock.current_capacity < material_quantity.quantity * quantity:
-                            return Response({'error': 'Insufficient material stock'}, status=status.HTTP_400_BAD_REQUEST)
-                        else:
-                            stock.current_capacity -= material_quantity.quantity * quantity
-                            stock.save()
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-            return Response({'success': 'Material stock subtracted successfully'})
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # Loop through each product and subtract the required material from the stock
+    for sale in serializer.validated_data:
+        product = get_object_or_404(Product, id=sale['product_id'])
+        for material_quantity in product.material_quantity.all():
+            material = material_quantity.ingredient
+            stock = get_object_or_404(MaterialStock, store=current_store, material=material)
+            if stock.current_capacity < material_quantity.quantity * sale['quantity']:
+                return Response({'error': 'Insufficient material stock'}, status=status.HTTP_400_BAD_REQUEST)
+            stock.current_capacity -= material_quantity.quantity * sale['quantity']
+            stock.save()
+
+    return Response({'success': 'Material stock subtracted successfully'})
 
 #///////////////////////////////////////////////////////////////
 #----------------HTML VIEW---------------------------------------
