@@ -31,4 +31,9 @@ urlpatterns = [
     path('products-add/<int:store_id>', views.add_product, name='add_product'),
     path('products-delete/<int:store_id>/<int:product_id>', views.delete_product, name='delete_product'),
 
+    path('material-stock-list/<int:store_id>', views.MaterialStockView.as_view(), name='store_stocks'),
+    path('material-stock-update/<int:pk>', views.MaterialStockUpdateView.as_view(), name='update_stock'),
+    path('material-stock-delete/<int:pk>', views.MaterialStockDeleteView.as_view(), name='delete_stock'),
+    path('material-stock-add/<int:store_id>', views.MaterialStockCreateView.as_view(), name='add_stock'),
+
 ]

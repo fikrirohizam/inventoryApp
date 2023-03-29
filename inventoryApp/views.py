@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse_lazy
 from inventoryApp import forms
 from .models import Material, MaterialStock, Store, Product
 from .serializers import ProductSerializer,RestocksSerializer,UserSigninSerializer,ProductCapacitySerializer,RestockGetSerializer,RestockPostSerializer,SalesSerializer, InventorySerializer,MaterialStockSerializer
@@ -382,7 +383,7 @@ def add_product(request, store_id):
             return redirect('store_products', store_id=store_id)
     else:
         form = forms.AddProductForm()
-    return render("whoa you failed to add")
+    return render("Something went wrong when adding product.")
 
 def delete_product(request, store_id, product_id):
     store = get_object_or_404(Store, pk=store_id)
@@ -394,13 +395,64 @@ def delete_product(request, store_id, product_id):
             return redirect('store_products', store_id=store_id)
     else:
         form = forms.DeleteProductForm()
-    return render("whoa you failed to delete")
+    return render("Something went wrong when deleting product.")
 
 
+class MaterialStockView(generic.TemplateView):
+    template_name = 'material_stocks.html'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        store_id = self.kwargs['store_id']
+        store = Store.objects.get(pk=store_id)
+        material_stocks = MaterialStock.objects.filter(store=store)
+        context['store'] = store
+        context['material_stocks'] = material_stocks
+        return context
+    
+class MaterialStockCreateView(generic.CreateView):
+    model = MaterialStock
+    form_class = forms.MaterialStockAddForm
+    template_name = 'material_stock_form.html'
 
+    def form_valid(self, form):
+        store_id = self.kwargs['store_id']
+        store = Store.objects.get(pk=store_id)
+        material = form.cleaned_data['material']
+        if MaterialStock.objects.filter(store=store, material=material).exists():
+            form.add_error('material', 'Material stock already exists for this store and material.')
+            return self.form_invalid(form)
+        material_stock = form.save(commit=False)
+        material_stock.store = store
+        material_stock.save()
+        return super().form_valid(form)
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['store_id'] = self.kwargs['store_id']
+        return kwargs
+    
+    def get_success_url(self):
+        store_id = self.kwargs['store_id']
+        return reverse_lazy('store_stocks', kwargs={'store_id': store_id})
+    
+class MaterialStockUpdateView(generic.UpdateView):
+    model = MaterialStock
+    form_class = forms.MaterialStockUpdateForm
+    template_name = 'material_stock_form.html'
+    def form_valid(self, form):
+        form.save()
+        return super().form_valid(form)
 
+    def get_success_url(self):
+        store_id = self.object.store.pk
+        return reverse_lazy('store_stocks', kwargs={'store_id': store_id})
 
-
+class MaterialStockDeleteView(generic.DeleteView):
+    model = MaterialStock
+    template_name = 'material_stock_delete.html'
+    def get_success_url(self):
+        store_id = self.object.store.pk
+        return reverse_lazy('store_stocks', kwargs={'store_id': store_id})
 
 

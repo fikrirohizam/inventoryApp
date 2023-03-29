@@ -48,9 +48,10 @@ class MaterialStock(models.Model):
     
     def __str__(self):
         s = self.store.store_name
+        m = self.material.name
         c = self.current_capacity
-        m = self.max_capacity
-        return ("%s %s/%s" % (s,c,m))
+        mc = self.max_capacity
+        return ("%s (%s) %s/%s" % (s,m,c,mc))
     class Meta:
         unique_together = (('store', 'material'),)
 

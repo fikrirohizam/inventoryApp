@@ -1,0 +1,25 @@
+{% load static %}
+<link rel="stylesheet" href="{% static 'inventoryApp/style.css' %}">
+
+  <h1>Delete Material Stock</h1>
+  <p>Are you sure you want to delete the following material stock?</p>
+
+  <dl>
+    <dt>Store:</dt>
+    <dd>{{ object.store }}</dd>
+
+    <dt>Material:</dt>
+    <dd>{{ object.material }}</dd>
+
+    <dt>Current Capacity:</dt>
+    <dd>{{ object.current_capacity }}</dd>
+
+    <dt>Max Capacity:</dt>
+    <dd>{{ object.max_capacity }}</dd>
+  </dl>
+
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit">Yes, delete</button>
+    <a href="{% url 'store_stocks' store_id=object.store.pk %}">Cancel</a>
+  </form>

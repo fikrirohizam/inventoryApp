@@ -1,0 +1,13 @@
+{% load static %}
+<link rel="stylesheet" href="{% static 'inventoryApp/style.css' %}">
+
+{% if form.material.is_hidden %}
+    <p>{{ form.message }}</p>
+{% else %}
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+    
+        <button type="submit">Save</button>
+    </form>
+{% endif %}
