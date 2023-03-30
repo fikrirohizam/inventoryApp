@@ -1,6 +1,8 @@
-{% load static %}
-<link rel="stylesheet" href="{% static 'inventoryApp/style.css' %}">
+{% extends 'base.html' %}
 
+{% block content %}
+
+<div class='container'>
 <h1>{{ store.store_name }} Material Stock</h1>
 
 <table class="table">
@@ -31,4 +33,7 @@
   </tbody>
 </table>
 
-<a href="{% url 'add_stock' store.pk %}" class="btn btn-success">Add Material Stock</a>
+<a href="{% url 'add_stock' store.pk %}" class="btn btn-success btn-sm">Add Material Stock</a>
+
+</div>
+{% endblock %}

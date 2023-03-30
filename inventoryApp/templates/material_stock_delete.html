@@ -1,25 +1,30 @@
 {% load static %}
+{% load django_bootstrap5 %}
+{% bootstrap_css %}
+
 <link rel="stylesheet" href="{% static 'inventoryApp/style.css' %}">
 
+<div class="container">
   <h1>Delete Material Stock</h1>
   <p>Are you sure you want to delete the following material stock?</p>
 
-  <dl>
-    <dt>Store:</dt>
-    <dd>{{ object.store }}</dd>
+  <dl class='row'>
+    <dt class="col-sm-3">Store:</dt>
+    <dd class="col-sm-9">{{ object.store }}</dd>
 
-    <dt>Material:</dt>
-    <dd>{{ object.material }}</dd>
+    <dt class="col-sm-3">Material:</dt>
+    <dd class="col-sm-9">{{ object.material }}</dd>
 
-    <dt>Current Capacity:</dt>
-    <dd>{{ object.current_capacity }}</dd>
+    <dt class="col-sm-3">Current Capacity:</dt>
+    <dd class="col-sm-9">{{ object.current_capacity }}</dd>
 
-    <dt>Max Capacity:</dt>
-    <dd>{{ object.max_capacity }}</dd>
+    <dt class="col-sm-3">Max Capacity:</dt>
+    <dd class="col-sm-9">{{ object.max_capacity }}</dd>
   </dl>
 
   <form method="post">
     {% csrf_token %}
-    <button type="submit">Yes, delete</button>
-    <a href="{% url 'store_stocks' store_id=object.store.pk %}">Cancel</a>
+    <button type="submit" class="btn btn-danger">Yes, delete</button>
+    <a href="{% url 'store_stocks' %}">Cancel</a>
   </form>
+</div>

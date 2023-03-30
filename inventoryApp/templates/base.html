@@ -1,0 +1,35 @@
+{% load static %}
+{% load django_bootstrap5 %}
+{% bootstrap_css %}
+
+<link rel="stylesheet" href="{% static 'inventoryApp/style.css' %}">
+
+<nav class="navbar navbar-expand-lg navbar-light bg-light" style="padding:20px 20px">
+    <a class="navbar-brand" href="#">Inventory App</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+  
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav mr-auto">
+        <li class="nav-item active">
+          <a class="nav-link" href="{% url 'store_stocks' %}">Material Stocks</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'store_products' %}">Products</a>
+        </li>
+        </ul>
+      {% if user.is_authenticated %}
+      <ul class="navbar-nav ms-auto">
+  <form action="{% url 'logout' %}" method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger" data-toggle="tooltip" title="Logout" data-placement="bottom">Logout</button>
+  </form>
+        </ul>
+{% endif %}
+    </div>
+  </nav>
+
+{% block content %}
+
+{% endblock %}

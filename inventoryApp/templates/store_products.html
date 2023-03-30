@@ -1,6 +1,8 @@
-{% load static %}
-<link rel="stylesheet" href="{% static 'inventoryApp/style.css' %}">
+{% extends 'base.html' %}
 
+{% block content %}
+
+<div class="container">
 <h1>{{ store.store_name }} Products</h1>
 
 <table class="table">
@@ -16,12 +18,12 @@
     <tr>
       <td>{{ product.name }}</td>
       <td>{% for material_quantity in product.material_quantity.all %}
-        {{ material_quantity.ingredient.name }}({{ material_quantity.quantity }})<br>
+        {{ material_quantity.ingredient.name }} ({{ material_quantity.quantity }})<br>
         {% endfor %}</td>
       <td>
-        <form method="POST" action="{% url 'delete_product' store_id=store.pk product_id=product.pk %}">
+        <form method="POST" action="{% url 'delete_product' product_id=product.pk %}">
           {% csrf_token %}
-          <input type="submit" value="Delete">
+          <button type="submit" class="btn btn-danger">Delete</button>
         </form>
       </td>
     </tr>
@@ -34,8 +36,8 @@
 </table>
 
 
-
-<form method="POST" action="{% url 'add_product' store_id=store.pk %}">
+{% if available_products %}
+<form method="POST" action="{% url 'add_product' %}">
   {% csrf_token %}
   <label for="product">Product:</label>
   <select name="product" id="product">
@@ -43,5 +45,11 @@
       <option value="{{ product.pk }}">{{ product.name }}</option>
     {% endfor %}
   </select>
-  <input type="submit" value="Add">
+  <button type="submit" class="btn btn-success btn-sm">Add</button>
 </form>
+{% else %}
+  <p>All currently available products already assigned to this store.</p>
+{% endif %}  
+
+<div class="container">
+{% endblock %}

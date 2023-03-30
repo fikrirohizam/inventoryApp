@@ -11,10 +11,10 @@ router = routers.DefaultRouter()
 
 urlpatterns = [
 
-# Django rest framework project
+    # Django rest framework project
     path('', include(router.urls), name='rest_index'),
     path('api-token-auth/', views.CustomAuthToken.as_view()),
-    path('api/login', views.login, name='login'),
+    path('api/login/', views.login_view, name='login'),
     path('restock/', views.restock, name='restock'),
     path('restocks/', views.restocks, name='restocks'),
 
@@ -27,13 +27,15 @@ urlpatterns = [
     path('material-stocks/<int:pk>', views.MaterialStockDetailAPIView.as_view(), name='material_stocks_detail'),
     path('products/', views.ProductListAPIView.as_view(), name='products'),
 
-    path('products-list/<int:store_id>', views.store_products, name='store_products'),
-    path('products-add/<int:store_id>', views.add_product, name='add_product'),
-    path('products-delete/<int:store_id>/<int:product_id>', views.delete_product, name='delete_product'),
-
-    path('material-stock-list/<int:store_id>', views.MaterialStockView.as_view(), name='store_stocks'),
+    #--------------------- HTML start -------------------------#
+    path('html-login/', views.login_html_view, name='html_login'),
+    path('products-list/', views.store_products, name='store_products'),
+    path('products-add/', views.add_product, name='add_product'),
+    path('products-delete/<int:product_id>/', views.delete_product, name='delete_product'),
+    path('material-stock-list/', views.MaterialStockView.as_view(), name='store_stocks'),
     path('material-stock-update/<int:pk>', views.MaterialStockUpdateView.as_view(), name='update_stock'),
     path('material-stock-delete/<int:pk>', views.MaterialStockDeleteView.as_view(), name='delete_stock'),
     path('material-stock-add/<int:store_id>', views.MaterialStockCreateView.as_view(), name='add_stock'),
+    path('logout/', views.logout_view, name='logout'),
 
 ]
