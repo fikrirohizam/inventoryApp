@@ -1,5 +1,6 @@
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from inventoryApp import forms
 from .models import Material, MaterialStock, Store, Product
 from .serializers import ProductSerializer,RestocksSerializer,UserSigninSerializer,ProductCapacitySerializer,RestockGetSerializer,RestockPostSerializer,SalesSerializer, InventorySerializer,MaterialStockSerializer
@@ -13,17 +14,23 @@ from .authentication import token_expire_handler, expires_in
 from rest_framework.authtoken.models import Token
 from django.contrib import messages
 from rest_framework import serializers
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, login
+from django.contrib.auth.forms import AuthenticationForm
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view, permission_classes
 from django.db.models import F
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth import logout
+from django.http import JsonResponse
+
 # Create your views here.
 
 
 @csrf_exempt
 @api_view(["POST"])
 @permission_classes((AllowAny,))
-def login(request):
+def login_view(request):
     signin_serializer = UserSigninSerializer(data = request.data)
     if not signin_serializer.is_valid():
         return Response(signin_serializer.errors, status = status.HTTP_400_BAD_REQUEST)
@@ -34,18 +41,49 @@ def login(request):
         )
     if not user:
         return Response({'detail': 'Invalid Credentials or activate account'}, status=status.HTTP_404_NOT_FOUND)
-        
+        authentication_form
     #TOKEN STUFF
     token, _ = Token.objects.get_or_create(user = user)
     username = signin_serializer.data['username']
     #token_expire_handler will check, if the token is expired it will generate new one
-    is_expired, token = token_expire_handler(token)     # The implementation will be described further
+    is_expired, token = token_expire_handler(token)     
+    if is_expired:
+        Token.objects.create(user = user)
 
     return Response({
         'user': username, 
         'expires_in': expires_in(token),
         'token': token.key
     }, status=status.HTTP_200_OK)
+
+@csrf_exempt
+def login_html_view(request):
+    if request.method == 'POST':
+        username = request.POST['username']
+        password = request.POST['password']
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            login(request, user)
+            
+            #TOKEN STUFF
+            token, _ = Token.objects.get_or_create(user = user)
+            #token_expire_handler will check, if the token is expired it will generate new one
+            is_expired, token = token_expire_handler(token)     
+            if is_expired:
+                Token.objects.create(user = user)
+                
+            # Set key cookie
+            response = redirect('store_products')
+            response.set_cookie(key='key', value=token.key, httponly=True)
+            return response
+        else:
+            return JsonResponse({'status': 'Login failed', 'error': 'Invalid Credentials or activate account'})
+    else:
+        return render(request, 'login.html')
+    
+def logout_view(request):
+    logout(request)
+    return redirect('html_login')
 
 class CustomAuthToken(ObtainAuthToken):
 
@@ -356,50 +394,49 @@ def multisales(request):
 #///////////////////////////////////////////////////////////////
 #----------------HTML VIEW---------------------------------------
 
-def store_products(request, store_id):
-    store = get_object_or_404(Store, pk=store_id)
-    products = store.products.all()
-    available_products = Product.objects.exclude(product_stores=store)
+@login_required
+def store_products(request):
+    current_store = Store.objects.filter(user__username=request.user).first()
+    products = current_store.products.all()
+    available_products = Product.objects.exclude(product_stores=current_store)
     return render(request, 'store_products.html', {
-        'store': store,
+        'store': current_store,
         'products': products,
         'available_products': available_products,
     })
 
-def add_product(request, store_id):
-    store = get_object_or_404(Store, pk=store_id)
+def add_product(request):
+    current_store = Store.objects.filter(user__username=request.user).first()
     if request.method == 'POST':
         form = forms.AddProductForm(request.POST)
         if form.is_valid():
             product = form.cleaned_data['product']
-            store.products.add(product)
-            return redirect('store_products', store_id=store_id)
+            current_store.products.add(product)
+            return redirect('store_products')
     else:
         form = forms.AddProductForm()
     return render("Something went wrong when adding product.")
 
-def delete_product(request, store_id, product_id):
-    store = get_object_or_404(Store, pk=store_id)
-    product = get_object_or_404(Product, pk=product_id, product_stores=store)
+def delete_product(request, product_id):
+    current_store = Store.objects.filter(user__username=request.user).first()
+    product = get_object_or_404(Product, pk=product_id, product_stores=current_store)
     if request.method == 'POST':
         form = forms.DeleteProductForm(request.POST)
         if form.is_valid():
-            store.products.remove(product)
-            return redirect('store_products', store_id=store_id)
+            current_store.products.remove(product)
+            return redirect('store_products')
     else:
         form = forms.DeleteProductForm()
     return render("Something went wrong when deleting product.")
 
-
-class MaterialStockView(generic.TemplateView):
+class MaterialStockView(LoginRequiredMixin, generic.TemplateView):
     template_name = 'material_stocks.html'
-
+    
     def get_context_data(self, **kwargs):
+        current_store = Store.objects.filter(user__username=self.request.user).first()
         context = super().get_context_data(**kwargs)
-        store_id = self.kwargs['store_id']
-        store = Store.objects.get(pk=store_id)
-        material_stocks = MaterialStock.objects.filter(store=store)
-        context['store'] = store
+        material_stocks = MaterialStock.objects.filter(store=current_store)
+        context['store'] = current_store
         context['material_stocks'] = material_stocks
         return context
     
@@ -427,7 +464,7 @@ class MaterialStockCreateView(generic.CreateView):
     
     def get_success_url(self):
         store_id = self.kwargs['store_id']
-        return reverse_lazy('store_stocks', kwargs={'store_id': store_id})
+        return reverse_lazy('store_stocks')
     
 class MaterialStockUpdateView(generic.UpdateView):
     model = MaterialStock
@@ -439,13 +476,13 @@ class MaterialStockUpdateView(generic.UpdateView):
 
     def get_success_url(self):
         store_id = self.object.store.pk
-        return reverse_lazy('store_stocks', kwargs={'store_id': store_id})
+        return reverse_lazy('store_stocks')
 
 class MaterialStockDeleteView(generic.DeleteView):
     model = MaterialStock
     template_name = 'material_stock_delete.html'
     def get_success_url(self):
         store_id = self.object.store.pk
-        return reverse_lazy('store_stocks', kwargs={'store_id': store_id})
+        return reverse_lazy('store_stocks')
 
 
