@@ -26,9 +26,10 @@ urlpatterns = [
     path('material-stocks/', views.MaterialStockListAPIView.as_view(), name='material_stocks'),
     path('material-stocks/<int:pk>', views.MaterialStockDetailAPIView.as_view(), name='material_stocks_detail'),
     path('products/', views.ProductListAPIView.as_view(), name='products'),
+    path('products/<int:pk>', views.ProductDeleteAPIView.as_view(), name='products_delete'),
 
     #--------------------- HTML start -------------------------#
-    path('html-login/', views.login_html_view, name='html_login'),
+    path('login/', views.login_html_view, name='html_login'),
     path('products-list/', views.store_products, name='store_products'),
     path('products-add/', views.add_product, name='add_product'),
     path('products-delete/<int:product_id>/', views.delete_product, name='delete_product'),
