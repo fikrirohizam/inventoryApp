@@ -46,9 +46,10 @@ class RestockPostSerializer(serializers.Serializer):
     quantity = serializers.IntegerField()
 
 class MaterialStockSerializer(serializers.ModelSerializer):
+    material_name = serializers.StringRelatedField(source='material.name')
     class Meta:
         model = MaterialStock
-        fields = ('id','material','max_capacity','current_capacity',)
+        fields = ('id','material','material_name','max_capacity','current_capacity',)
         read_only_fields = ['current_capacity', 'material',]
 
 class InventoryMaterialStockSerializer(serializers.ModelSerializer):
@@ -75,11 +76,12 @@ class MaterialQuantitySerializer(serializers.ModelSerializer):
         fields = ['quantity', 'ingredient']
 
 class ProductSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField()
     material_quantity = MaterialQuantitySerializer(many=True)
 
     class Meta:
         model = Product
-        fields = ['name', 'material_quantity']
+        fields = ['id', 'name', 'material_quantity']
 
 """     def create(self, validated_data):
         material_quantities_data = validated_data.pop('material_quantity')
