@@ -39,7 +39,7 @@ class MultiSalesTestCase(APITestCase):
         }
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, {'success': 'Material stock subtracted successfully'})
+        self.assertEqual(response.data['sales'][0]['success'], 'Material stock subtracted successfully')
         # Check that material stock has been updated
         self.material_stock1.refresh_from_db()
         self.material_stock2.refresh_from_db()

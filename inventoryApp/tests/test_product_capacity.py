@@ -30,6 +30,7 @@ class ProductCapacitySerializerTestCase(APITestCase):
             'store_name': self.store.store_name,
             'products': [
                 {
+                    'id': self.product1.id,
                     'name': self.product1.name,
                     'material_quantity': [
                         {
@@ -80,6 +81,7 @@ class ProductCapacityViewTestCase(APITestCase):
             'store_name': self.store.store_name,
             'products': [
                 {
+                    'id': self.product1.id,
                     'name': self.product1.name,
                     'material_quantity': [
                         {

@@ -1,4 +1,4 @@
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from rest_framework import status
 from rest_framework.test import APITestCase
 from ..models import Store, Material, MaterialStock, User
@@ -31,9 +31,9 @@ class ProductListAPIViewTestCase(APITestCase):
 
     def test_delete_product_from_store(self):
         self.authenticate()
-        data = {'product_id': self.product.id}
-        response = self.client.delete(self.url, data)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        url = reverse('products_delete', kwargs={'pk': self.product.id})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(self.store.products.filter(id=self.product.id).exists())
 
     def test_serialized_product_data(self):
