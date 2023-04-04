@@ -31,7 +31,7 @@ class Product(models.Model):
 class Store(models.Model):
     store_id = models.AutoField(primary_key=True)
     store_name = models.CharField(max_length=100)
-    user = models.ForeignKey(User,related_name='user_store',on_delete=models.CASCADE)
+    user = models.OneToOneField(User,related_name='user_store',on_delete=models.CASCADE)
     products = models.ManyToManyField(Product,related_name='product_stores')
     def __str__(self):
         return self.store_name
