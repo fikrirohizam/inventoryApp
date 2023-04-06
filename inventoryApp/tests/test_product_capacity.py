@@ -35,7 +35,8 @@ class ProductCapacitySerializerTestCase(APITestCase):
                     'material_quantity': [
                         {
                             "quantity": self.material_quantity1.quantity,
-                            "ingredient": self.material_quantity1.ingredient.pk
+                            "ingredient": self.material_quantity1.ingredient.pk,
+                            "ingredient_name": self.material_quantity1.ingredient.name
                         }
                     ]
                 }
@@ -86,7 +87,8 @@ class ProductCapacityViewTestCase(APITestCase):
                     'material_quantity': [
                         {
                             "quantity": self.material_quantity1.quantity,
-                            "ingredient": self.material_quantity1.ingredient.pk
+                            "ingredient": self.material_quantity1.ingredient.pk,
+                            "ingredient_name": self.material_quantity1.ingredient.name
                         }
                     ]
                 }

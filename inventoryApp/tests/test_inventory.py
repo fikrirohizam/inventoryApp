@@ -19,7 +19,7 @@ class InventorySerializerTestCase(APITestCase):
     def test_contains_expected_fields(self):
         self.authenticate()
         data = self.serializer.data
-        self.assertEqual(set(data['materials'][0].keys()), set(['material', 'max_capacity', 'current_capacity', 'percentage_of_capacity']))
+        self.assertEqual(set(data['materials'][0].keys()), set(['material', 'material_name', 'max_capacity', 'current_capacity', 'percentage_of_capacity']))
     
     def test_material_name_field_content(self):
         data = self.serializer.data

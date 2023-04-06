@@ -58,8 +58,10 @@ class MultiSalesTestCase(APITestCase):
         }
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data[0]['non_field_errors'][0], 'Invalid product id')
-
+        self.assertEqual(response.data['error'], 
+                         'Sales request failed due to invalid data. Please review the following list of invalid sales')
+        self.assertIn(response.data['sales'][0]['non_field_errors'][0], 'Invalid product id')
+        
     def test_multisales_with_insufficient_stock(self):
         self.authenticate()
         # Reduce the stock capacity so that it's not enough to fulfill the sales
@@ -73,8 +75,10 @@ class MultiSalesTestCase(APITestCase):
         }
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data[0]['non_field_errors'][0], 'Insufficient material stock')
-
+        self.assertEqual(response.data['error'], 
+                         'Sales request failed due to invalid data. Please review the following list of invalid sales')
+        self.assertIn(response.data['sales'][0]['non_field_errors'][0], 'Insufficient material stock')
+        
 class SalesSerializerTestCase(APITestCase):
     def setUp(self):
         self.user = User.objects.create(user_id=1)
