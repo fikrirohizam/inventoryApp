@@ -1,9 +1,8 @@
-from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from inventoryApp import forms
-from .models import Material, MaterialStock, Store, Product
-from .serializers import ProductSerializer,RestocksSerializer,UserSigninSerializer,ProductCapacitySerializer,RestockGetSerializer,RestockPostSerializer,SalesSerializer, InventorySerializer,MaterialStockSerializer
+from .models import MaterialStock, Store, Product
+from inventoryApp import serializers as serializersapp
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework import generics
 from django.views import generic
@@ -15,7 +14,6 @@ from rest_framework.authtoken.models import Token
 from django.contrib import messages
 from rest_framework import serializers
 from django.contrib.auth import authenticate, login
-from django.contrib.auth.forms import AuthenticationForm
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view, permission_classes
 from django.db.models import F
@@ -31,7 +29,7 @@ from django.http import JsonResponse
 @api_view(["POST"])
 @permission_classes((AllowAny,))
 def login_view(request):
-    signin_serializer = UserSigninSerializer(data = request.data)
+    signin_serializer = serializersapp.UserSigninSerializer(data = request.data)
     if not signin_serializer.is_valid():
         return Response(signin_serializer.errors, status = status.HTTP_400_BAD_REQUEST)
 
@@ -108,13 +106,13 @@ def restock(request):
     current_store = Store.objects.get(user__username=request.user)
     if request.method == 'GET':
 
-        serializer = RestockGetSerializer(current_store.stocks.all(), many=True)
+        serializer = serializersapp.RestockGetSerializer(current_store.stocks.all(), many=True)
 
         return Response(serializer.data)
 
     elif request.method == 'POST':
         current_store = Store.objects.filter(user__username=request.user).first()
-        serializer = RestockPostSerializer(data=request.data)
+        serializer = serializersapp.RestockPostSerializer(data=request.data)
         if serializer.is_valid():
             material_id = serializer.validated_data['material']
             add_value = serializer.validated_data['quantity']
@@ -146,7 +144,7 @@ def inventory(request):
     """
     if request.method == 'GET':
         materialstock = MaterialStock.objects.all()
-        serializer = InventorySerializer(materialstock, context={'request':request.user})
+        serializer = serializersapp.InventorySerializer(materialstock, context={'request':request.user})
         return Response(serializer.data)
     
 @api_view(['GET',])
@@ -158,7 +156,7 @@ def product_capacity(request):
     if request.method == 'GET':
         current_store = Store.objects.filter(user__username=request.user).first()
         materialstock = Product.objects.all()
-        serializer = ProductCapacitySerializer(current_store, context={'currentstore':current_store})
+        serializer = serializersapp.ProductCapacitySerializer(current_store)
         return Response(serializer.data)
      
 @api_view(['POST'])
@@ -170,7 +168,7 @@ def sales(request):
     """
     if request.method == 'POST':
         current_store = Store.objects.filter(user__username=request.user).first()
-        serializer = SalesSerializer(data=request.data, context={'store':current_store})
+        serializer = serializersapp.SalesSerializer(data=request.data, context={'store':current_store})
         if serializer.is_valid():
             product_id = serializer.validated_data['product_id']
             quantity = serializer.validated_data['quantity']
@@ -209,7 +207,7 @@ class MaterialStockListAPIView(generics.ListCreateAPIView):
     def get_serializer_class(self):
         # enable adding current_capacity value when creating new MaterialStock
         current_store = Store.objects.filter(user__username=self.request.user).first()
-        class NewMaterialStockSerializer(MaterialStockSerializer):
+        class NewMaterialStockSerializer(serializersapp.MaterialStockSerializer):
             store = serializers.HiddenField(
                 default=current_store
             )
@@ -224,19 +222,25 @@ class MaterialStockListAPIView(generics.ListCreateAPIView):
         material = request.data.get('material', None)
         current_cap = request.data.get('current_capacity')
         max_cap = request.data.get('max_capacity')
-        if current_store is not None and material is not None:
-            existing_material_stock = MaterialStock.objects.filter(store=current_store, material=material).first()
-            if existing_material_stock:
-                return Response({'error': "This material stock already exists in this store. Please use other material or update existing stock."}, status= status.HTTP_400_BAD_REQUEST)
-            elif max_cap < current_cap:
-                return Response({'error': "Max capacity must NOT be lower than current capacity."}, status= status.HTTP_400_BAD_REQUEST)
-            else:
-                serializer = self.get_serializer(existing_material_stock)
-                Response(serializer.data, status=status.HTTP_200_OK)
+        
+        if current_store is None or material is None:
+            return super().create(request, *args, **kwargs)
+
+        existing_material_stock = MaterialStock.objects.filter(store=current_store, material=material).first()
+        if existing_material_stock:
+            return Response({
+                'error': "This material stock already exists in this store. Please use other material or update existing stock."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if max_cap < current_cap:
+            return Response({
+                'error': "Max capacity must not be lower than current capacity."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         return super().create(request, *args, **kwargs)
 
 class MaterialStockDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = MaterialStockSerializer
+    serializer_class = serializersapp.MaterialStockSerializer
 
     def get_queryset(self):
         current_store = Store.objects.filter(user__username=self.request.user).first()
@@ -255,7 +259,7 @@ class MaterialStockDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
         return Response(serializer.data)
 
 class ProductListAPIView(generics.ListAPIView):
-    serializer_class = ProductSerializer
+    serializer_class = serializersapp.ProductSerializer
 
     def get_queryset(self):
         current_store = Store.objects.filter(user__username=self.request.user).first()
@@ -276,48 +280,11 @@ class ProductListAPIView(generics.ListAPIView):
             return Response({"error": "Product already assigned to this store"}, status=status.HTTP_400_BAD_REQUEST) 
         except Store.DoesNotExist:
             current_store.products.add(product)
-            serializer = ProductSerializer(product)
+            serializer = serializersapp.ProductSerializer(product)
             return Response({"success": "Product has been assigned to this store", "product":serializer.data},status=status.HTTP_200_OK)
-
-    """ 
-# This function allows user to delete a product from the store.
-# When the user presses the delete button in the web view, all products are removed from the store.
-# When the user posts a JSON request with a product_id, one product is removed.
-# Note: This functionality has been disabled since users can delete product directly using the ProductDeleteAPIView.
-    def delete(self, request):
-
-        current_store = Store.objects.filter(user__username=self.request.user).first()
-
-        product_id = request.data.get("product_id")
-        if not product_id:
-            return Response({'error': " 'product_id' value is not given."}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            product = Product.objects.get(id=product_id)
-        except Product.DoesNotExist:
-            return Response({"error": "Product does not exist"}, status=400)
-        try:
-            existing_product = Store.objects.get(store_id= current_store.pk, products=product)
-            current_store.products.remove(product)
-            return Response({"success": "Product has been removed from store"},status=status.HTTP_200_OK)
-        except Store.DoesNotExist:
-            return Response({"error": "This product is not available in this store."},status=status.HTTP_204_NO_CONTENT) """
-    
-    """ 
-# This function allows user to create a new product, 
-# but it has been disabled as per the project requirements.
-# Related requirement: User is only allowed to assign existing products to the current store.
-# Note: Incomplete function.
-    def create(self, request):
-        current_store = Store.objects.filter(user__username=self.request.user).first()
-        serializer = ProductSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(store=current_store)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    """
+        
 class ProductDeleteAPIView(generics.RetrieveDestroyAPIView):
-    serializer_class = ProductSerializer
+    serializer_class = serializersapp.ProductSerializer
 
     def update(self, request, *args, **kwargs):
         return Response({'error':'Update product is not allowed'},status=status.HTTP_405_METHOD_NOT_ALLOWED)
@@ -343,7 +310,7 @@ class ProductDeleteAPIView(generics.RetrieveDestroyAPIView):
 @api_view(['GET', 'POST'])
 def restocks(request):
     """
-    List all materials, quantity, and total price, or create a new one (restock).
+    List all material stocks, price for restocking, and amount of restocks.
     """
     current_store = Store.objects.filter(user__username=request.user).first()
     if request.method == 'GET':
@@ -361,7 +328,7 @@ def restocks(request):
                 'material': material.pk,
                 'price' : material.price,
                 'restock quantity': added_quantity,
-                'current_capacity': "%i/%i" % (material_stock.current_capacity,material_stock.max_capacity),
+                'current_capacity': f"{material_stock.current_capacity}/{material_stock.max_capacity}",
                 'total_price': total_price,
             })
             response_data['overall_price'] = overall_price
@@ -396,45 +363,55 @@ def restocks(request):
         
         else:
             # if user specify which material stocks to update, update current_capacity of specified stocks based on given material and quantity.
-            serializer = RestocksSerializer(data=request.data['materials'], many=True, context={'store': current_store})
-            if serializer.is_valid():
-                overall_price = 0
-                response_data = {'materials': []}
-                for material_data in serializer.validated_data:
-                    material_id = material_data['material']
-                    added_quantity = material_data['quantity']
-                    material_stock = MaterialStock.objects.filter(store=current_store, material=material_id).first()
+            serializer = serializersapp.RestocksSerializer(data=request.data['materials'], many=True, context={'store': current_store})
 
-                    if material_stock is None:
-                        return Response({'error': 'Material stock not found.'}, status=status.HTTP_404_NOT_FOUND)
-                    
-                    new_capacity = material_stock.current_capacity + added_quantity
-                    if new_capacity > material_stock.max_capacity:
-                        return Response({'error': 'Adding this amount would exceed maximum capacity.'}, status=status.HTTP_400_BAD_REQUEST)
-                    material_stock.current_capacity = new_capacity
-                    material = material_stock.material
-                    material_stock.save(update_fields=['current_capacity'])
-                    total_price = added_quantity * material.price
-                    overall_price += total_price
+            if not serializer.is_valid():
+                error_data = {'error': 'Restocks request failed due to invalid data. Please review the following list of invalid restocks',
+                              'materials': serializer.errors}
+                return Response(error_data, status=status.HTTP_400_BAD_REQUEST)
+                        
+            overall_price = 0
+            response_data = {'materials': []}
+            for material_data in serializer.validated_data:
+                material_id = material_data['material']
+                added_quantity = material_data['quantity']
+                material_stock = MaterialStock.objects.filter(store=current_store, material=material_id).first()
+                if material_stock is None:
+                    return Response({'error': 'Material stock not found.'}, status=status.HTTP_404_NOT_FOUND)
+                
+                new_capacity = material_stock.current_capacity + added_quantity
+                if new_capacity > material_stock.max_capacity:
                     response_data['materials'].append({
-                        'material': material_id,
-                        'quantity': added_quantity,
-                        'current_capacity': material_stock.current_capacity,
-                        'total_price': total_price,
+                    'material': material_id,
+                    'quantity': added_quantity,
+                    'current_capacity': f"{material_stock.current_capacity}/{material_stock.max_capacity}",
+                    'error': 'Restock for this material failed. Adding this amount would exceed maximum capacity.',
                     })
-                response_data['overall_price'] = overall_price
-            else:
-                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                    continue
+                material_stock.current_capacity = new_capacity
+                material = material_stock.material
+                material_stock.save(update_fields=['current_capacity'])
+                total_price = added_quantity * material.price
+                overall_price += total_price
+                response_data['materials'].append({
+                    'material': material_id,
+                    'quantity': added_quantity,
+                    'current_capacity': f"{material_stock.current_capacity}/{material_stock.max_capacity}",
+                    'total_price': total_price,
+                })
+            response_data['overall_price'] = overall_price
         return Response(response_data, status=status.HTTP_200_OK)
 
 # Allow multiple product sales in a single JSON POST request using dict list
 @api_view(['POST'])
 def multisales(request):
     current_store = Store.objects.filter(user__username=request.user).first()
-    serializer = SalesSerializer(data=request.data['sales'], context={'store':current_store}, many=True)
+    serializer = serializersapp.SalesSerializer(data=request.data['sales'], context={'store':current_store}, many=True)
 
     if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        error_data = {'error': 'Sales request failed due to invalid data. Please review the following list of invalid sales',
+                      'sales': serializer.errors}
+        return Response(error_data, status=status.HTTP_400_BAD_REQUEST)
 
     # Loop through each product and subtract the required material from the stock
     for sale in serializer.validated_data:
@@ -512,8 +489,7 @@ class MaterialStockCreateView(generic.CreateView):
     template_name = 'material_stock_form.html'
 
     def form_valid(self, form):
-        store_id = self.kwargs['store_id']
-        store = Store.objects.get(pk=store_id)
+        store = Store.objects.get(pk=self.kwargs['store_id'])
         material = form.cleaned_data['material']
         if MaterialStock.objects.filter(store=store, material=material).exists():
             form.add_error('material', 'Material stock already exists for this store and material.')
@@ -529,7 +505,6 @@ class MaterialStockCreateView(generic.CreateView):
         return kwargs
     
     def get_success_url(self):
-        store_id = self.kwargs['store_id']
         return reverse_lazy('store_stocks')
     
 class MaterialStockUpdateView(generic.UpdateView):
@@ -541,14 +516,12 @@ class MaterialStockUpdateView(generic.UpdateView):
         return super().form_valid(form)
 
     def get_success_url(self):
-        store_id = self.object.store.pk
         return reverse_lazy('store_stocks')
 
 class MaterialStockDeleteView(generic.DeleteView):
     model = MaterialStock
     template_name = 'material_stock_delete.html'
     def get_success_url(self):
-        store_id = self.object.store.pk
         return reverse_lazy('store_stocks')
 
 
