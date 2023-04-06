@@ -10,19 +10,19 @@ class DeleteProductForm(forms.Form):
 class MaterialStockUpdateForm(forms.ModelForm):
     class Meta:
         model = MaterialStock
-        fields = ['current_capacity']
+        fields = ['max_capacity']
 
-    def clean_current_capacity(self):
-        current_capacity = self.cleaned_data.get('current_capacity')
-        max_capacity = self.instance.max_capacity
-        if current_capacity > max_capacity:
-            raise forms.ValidationError("Current capacity cannot be higher than max capacity.")
-        return current_capacity
+    def clean_max_capacity(self):
+        max_capacity = self.cleaned_data.get('max_capacity')
+        current_capacity = self.instance.current_capacity
+        if max_capacity < current_capacity:
+            raise forms.ValidationError("Max capacity cannot be lower than current capacity.")
+        return max_capacity
     
 class MaterialStockAddForm(forms.ModelForm):
     class Meta:
         model = MaterialStock
-        fields = ['material','max_capacity','current_capacity']
+        exclude = ['store']
 
     def __init__(self, *args, **kwargs):
         store_id = kwargs.pop('store_id', None)
