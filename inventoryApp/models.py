@@ -43,15 +43,17 @@ class MaterialStock(models.Model):
     current_capacity =  models.IntegerField()
     @property
     def percentage_of_capacity(self):
-        percent = (100 * self.current_capacity/self.max_capacity)
-        return float("%.2f" % percent)
+        current_capacity = self.current_capacity
+        max_capacity = self.max_capacity
+        percentage = (current_capacity / max_capacity) * 100
+        return round(percentage, 2)
     
     def __str__(self):
-        s = self.store.store_name
-        m = self.material.name
-        c = self.current_capacity
-        mc = self.max_capacity
-        return ("%s (%s) %s/%s" % (s,m,c,mc))
+        store_name = self.store.store_name
+        material_name = self.material.name
+        current_capacity = self.current_capacity
+        max_capacity = self.max_capacity
+        return f"{store_name} ({material_name}) {current_capacity}/{max_capacity}"
     class Meta:
         unique_together = (('store', 'material'),)
 
