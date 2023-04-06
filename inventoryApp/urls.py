@@ -1,13 +1,8 @@
-from django.urls import include, path, re_path
+from django.urls import include, path
 from rest_framework import routers
 from inventoryApp import views
-from rest_framework.authtoken import views as viewsRest
-from rest_framework.urlpatterns import format_suffix_patterns
-
-
 
 router = routers.DefaultRouter()
-
 
 urlpatterns = [
 
@@ -36,7 +31,7 @@ urlpatterns = [
     path('material-stock-list/', views.MaterialStockView.as_view(), name='store_stocks'),
     path('material-stock-update/<int:pk>', views.MaterialStockUpdateView.as_view(), name='update_stock'),
     path('material-stock-delete/<int:pk>', views.MaterialStockDeleteView.as_view(), name='delete_stock'),
-    path('material-stock-add/<int:store_id>', views.MaterialStockCreateView.as_view(), name='add_stock'),
+    path('material-stock-create/<int:store_id>', views.MaterialStockCreateView.as_view(), name='create_stock'),
     path('logout/', views.logout_view, name='logout'),
 
 ]
