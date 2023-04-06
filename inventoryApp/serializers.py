@@ -1,10 +1,7 @@
-from django.forms import DateInput, FloatField
-from .models import Material, MaterialQuantity, MaterialStock, Store, Product
+from inventoryApp import models
 from rest_framework import serializers
 from django.db.models import Sum
-from django.db.models import F, Value
-from django.db.models.functions import Coalesce
-from django.db.models import OuterRef, Subquery
+from django.db.models import F
 
 class UserSigninSerializer(serializers.Serializer):
     username = serializers.CharField(required = True)
@@ -14,7 +11,7 @@ class MaterialQuantitySerializer2(serializers.ModelSerializer):
     material = serializers.SerializerMethodField()
 
     class Meta:
-        model = MaterialQuantity
+        model = models.MaterialQuantity
         fields = ('material','quantity',)
 
     def get_material(self,obj):
@@ -28,17 +25,17 @@ class RestockGetSerializer2(serializers.Serializer):
         fields = ('materials', 'total_price')
 
     def get_materials(self, instance):
-        return MaterialQuantitySerializer2(MaterialQuantity.objects.all(),many=True).data
+        return MaterialQuantitySerializer2(models.MaterialQuantity.objects.all(),many=True).data
     
     def get_total_price(self, instance):
-        quantitysum = MaterialQuantity.objects.aggregate(result=Sum(F('ingredient__price')* F('quantity')))
+        quantitysum = models.MaterialQuantity.objects.aggregate(result=Sum(F('ingredient__price')* F('quantity')))
         return next(iter(quantitysum.values()))
     
 class RestockGetSerializer(serializers.ModelSerializer):
     material_name = serializers.CharField(source='material.name')
     material_price = serializers.DecimalField(source='material.price', max_digits=10, decimal_places=2)
     class Meta:
-        model = MaterialStock
+        model = models.MaterialStock
         fields = ['material_name', 'material_price', 'max_capacity', 'current_capacity']
         
 class RestockPostSerializer(serializers.Serializer):
@@ -48,16 +45,17 @@ class RestockPostSerializer(serializers.Serializer):
 class MaterialStockSerializer(serializers.ModelSerializer):
     material_name = serializers.StringRelatedField(source='material.name')
     class Meta:
-        model = MaterialStock
+        model = models.MaterialStock
         fields = ('id','material','material_name','max_capacity','current_capacity',)
         read_only_fields = ['current_capacity', 'material',]
 
 class InventoryMaterialStockSerializer(serializers.ModelSerializer):
     material = serializers.SerializerMethodField()
+    material_name = serializers.StringRelatedField(source='material.name')
     percentage_of_capacity = serializers.ReadOnlyField()
     class Meta:
-        model = MaterialStock
-        fields = ('material','max_capacity','current_capacity', 'percentage_of_capacity')
+        model = models.MaterialStock
+        fields = ('material', 'material_name', 'max_capacity','current_capacity', 'percentage_of_capacity')
     def get_material(self,obj):
         return obj.material.material_id
     
@@ -68,52 +66,32 @@ class InventorySerializer(serializers.Serializer):
         
     def get_materials(self, instance):
         user = self.context["request"]
-        return InventoryMaterialStockSerializer(MaterialStock.objects.filter(store__user__username= user),many=True).data
+        return InventoryMaterialStockSerializer(models.MaterialStock.objects.filter(store__user__username= user),many=True).data
 
 class MaterialQuantitySerializer(serializers.ModelSerializer):
+    ingredient_name = serializers.StringRelatedField(source='ingredient.name')
     class Meta:
-        model = MaterialQuantity
-        fields = ['quantity', 'ingredient']
+        model = models.MaterialQuantity
+        fields = ['quantity', 'ingredient', 'ingredient_name']
 
 class ProductSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField()
     material_quantity = MaterialQuantitySerializer(many=True)
 
     class Meta:
-        model = Product
+        model = models.Product
         fields = ['id', 'name', 'material_quantity']
-
-"""     def create(self, validated_data):
-        material_quantities_data = validated_data.pop('material_quantity')
-        product = Product.objects.create(**validated_data)
-        current_store = Store.objects.filter(user=self.context['request'].user).first()
-
-        for material_quantity_data in material_quantities_data:
-            quantity = material_quantity_data['quantity']
-            material = material_quantity_data['material']
-            material_quantity, created = MaterialQuantity.objects.get_or_create(quantity=quantity, material_id=material)
-            if not created:
-                existing_product = Product.objects.filter(product_stores=current_store, material_quantity=material_quantity).first()
-                if existing_product:
-                    product = existing_product
-                else:
-                    material_quantity.products.add(product)
-            else:
-                product.material_quantity.add(product)
-
-        product.product_stores.add(current_store)
-        return product """
     
 class ProductCapacitySerializer(serializers.ModelSerializer):
     products = ProductSerializer(many=True)
     material_stock = serializers.SerializerMethodField()
 
     class Meta:
-        model = Store
+        model = models.Store
         fields = ['store_name', 'products', 'material_stock']
 
     def get_material_stock(self, store):
-        material_stocks = MaterialStock.objects.filter(store=store)
+        material_stocks = models.MaterialStock.objects.filter(store=store)
         product_data = []
 
         for product in store.products.all():
@@ -147,22 +125,24 @@ class SalesSerializer(serializers.Serializer):
 
     def validate(self, data):
         product_id = data.get('product_id')
-
         try:
-            product = Product.objects.get(id=product_id)
-        except (Product.DoesNotExist):
-            raise serializers.ValidationError('Invalid product id')
+            product = models.Product.objects.get(id=product_id)
+        except (models.Product.DoesNotExist):
+            raise serializers.ValidationError({'product_id': product_id, 
+                                               'non_field_errors': 'Invalid product id'})
 
         for material_quantity in product.material_quantity.all():
             material = material_quantity.ingredient
             try:
-                stock = MaterialStock.objects.get(store=self.context['store'], material=material)
-            except MaterialStock.DoesNotExist:
-                raise serializers.ValidationError('Store does not have the required material in stock')
+                stock = models.MaterialStock.objects.get(store=self.context['store'], material=material)
+            except models.MaterialStock.DoesNotExist:
+                raise serializers.ValidationError({'product_id': product_id, 
+                                                   'non_field_errors': 'Store does not have the required material in stock'})
             else:
                 if stock.current_capacity < material_quantity.quantity * data['quantity']:
-                    raise serializers.ValidationError('Insufficient material stock')
-        
+                    raise serializers.ValidationError({'product_id': product_id, 
+                                                       'non_field_errors': 'Insufficient material stock'})
+
         return data
 
 
@@ -170,11 +150,22 @@ class RestocksSerializer(serializers.Serializer):
     material = serializers.IntegerField()
     quantity = serializers.IntegerField()
 
-    def validate_material(self, value):
+    def validate(self, data):
+        material = data.get('material')
+        quantity = data.get('quantity')
+        
         try:
-            MaterialStock.objects.get(store=self.context['store'], material=value)
-        except MaterialStock.DoesNotExist:
-            raise serializers.ValidationError('Material stock not found.')
-        return value
+            material_stock = models.MaterialStock.objects.get(store=self.context['store'], material=material)
+        except models.MaterialStock.DoesNotExist:
+            raise serializers.ValidationError({'material': material,
+                                               'quantity': quantity,
+                                               'non_field_errors': 'Invalid product id'})
+        
+        if quantity + material_stock.current_capacity > material_stock.max_capacity:
+            raise serializers.ValidationError({'material': material,
+                                               'quantity': quantity,
+                                               'non_field_errors': 'The quantity to be restocked is more than the maximum capacity of the material stock.'})
+
+        return data
     
 
