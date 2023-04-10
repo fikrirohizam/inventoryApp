@@ -22,8 +22,10 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth import logout
 from django.http import JsonResponse
 
-# Create your views here.
 
+#===============================================================
+#                   login, logout and token
+#===============================================================
 
 @csrf_exempt
 @api_view(["POST"])
@@ -98,6 +100,11 @@ class CustomAuthToken(ObtainAuthToken):
         })
     
 
+#===============================================================
+#                       DRF Views
+#===============================================================
+
+#----------------------- restock view -------------------------------
 @api_view(['GET', 'POST'])
 def restock(request):
     """
@@ -136,7 +143,7 @@ def restock(request):
             return Response(response_data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
+#----------------------- inventory view -------------------------------
 @api_view(['GET',])
 def inventory(request):
     """
@@ -147,6 +154,7 @@ def inventory(request):
         serializer = serializersapp.InventorySerializer(materialstock, context={'request':request.user})
         return Response(serializer.data)
     
+#----------------------- product_capacity view -------------------------------
 @api_view(['GET',])
 def product_capacity(request):
     """
@@ -158,21 +166,28 @@ def product_capacity(request):
         materialstock = Product.objects.all()
         serializer = serializersapp.ProductCapacitySerializer(current_store)
         return Response(serializer.data)
-     
+
+#----------------------- sales view -------------------------------
 @api_view(['POST'])
 def sales(request):
     """
-    Post product sold and quantity of product, which then
-    reduces the material stocks related to the product based
-    on how much material it needs, and how much product is sold
-    """
+    POST request to record the sale of a 'product' and its 'quantity'.
+    This view updates the corresponding MaterialStocks based on the
+    product's material requirements and the quantity sold. The material
+    stocks will be reduced accordingly.
+    """ 
     if request.method == 'POST':
         current_store = Store.objects.filter(user__username=request.user).first()
         serializer = serializersapp.SalesSerializer(data=request.data, context={'store':current_store})
-        if serializer.is_valid():
+
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        else:
             product_id = serializer.validated_data['product_id']
             quantity = serializer.validated_data['quantity']
 
+            
             # Get the store and product objects
             try:
                 product = Product.objects.get(id=product_id)
@@ -186,17 +201,15 @@ def sales(request):
                     stock = MaterialStock.objects.get(store=current_store, material=material)
                 except MaterialStock.DoesNotExist:
                     return Response({'error': 'Store does not have the required material in stock'}, status=status.HTTP_400_BAD_REQUEST)
-                else:
-                    if stock.current_capacity < material_quantity.quantity * quantity:
-                        return Response({'error': 'Insufficient material stock'}, status=status.HTTP_400_BAD_REQUEST)
-                    else:
-                        stock.current_capacity -= material_quantity.quantity * quantity
-                        stock.save()
 
-            return Response({'success': 'Material stock subtracted successfully'})
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                stock.current_capacity -= material_quantity.quantity * quantity
+                stock.save()
 
+
+         
+            return Response('response_data', status=status.HTTP_200_OK)
+
+#----------------------- MaterialStockListAPIView view -------------------------------
 class MaterialStockListAPIView(generics.ListCreateAPIView):
 
     def get_queryset(self):
@@ -219,12 +232,14 @@ class MaterialStockListAPIView(generics.ListCreateAPIView):
 
     def create(self, request, *args, **kwargs):
         current_store = Store.objects.filter(user__username= request.user).first()
-        material = request.data.get('material', None)
+        required_fields = ['material', 'current_capacity', 'max_capacity']
+        for field in required_fields:
+            if not request.data.get(field):
+                return Response({'error': f'{field.capitalize()} field is missing.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        material = request.data.get('material')
         current_cap = request.data.get('current_capacity')
         max_cap = request.data.get('max_capacity')
-        
-        if current_store is None or material is None:
-            return super().create(request, *args, **kwargs)
 
         existing_material_stock = MaterialStock.objects.filter(store=current_store, material=material).first()
         if existing_material_stock:
@@ -239,6 +254,7 @@ class MaterialStockListAPIView(generics.ListCreateAPIView):
 
         return super().create(request, *args, **kwargs)
 
+#----------------------- MaterialStockDetailAPIView view -------------------------------
 class MaterialStockDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = serializersapp.MaterialStockSerializer
 
@@ -258,6 +274,7 @@ class MaterialStockDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
         self.perform_update(serializer)
         return Response(serializer.data)
 
+#----------------------- ProductListAPIView view -------------------------------
 class ProductListAPIView(generics.ListAPIView):
     serializer_class = serializersapp.ProductSerializer
 
@@ -283,6 +300,7 @@ class ProductListAPIView(generics.ListAPIView):
             serializer = serializersapp.ProductSerializer(product)
             return Response({"success": "Product has been assigned to this store", "product":serializer.data},status=status.HTTP_200_OK)
         
+#----------------------- ProductDeleteAPIView view -------------------------------
 class ProductDeleteAPIView(generics.RetrieveDestroyAPIView):
     serializer_class = serializersapp.ProductSerializer
 
@@ -306,6 +324,8 @@ class ProductDeleteAPIView(generics.RetrieveDestroyAPIView):
     def perform_destroy(self, instance):
         instance.delete()
 
+
+#----------------------- restocks view -------------------------------
 # Allow multiple material restocking in a single JSON POST request using dict list
 @api_view(['GET', 'POST'])
 def restocks(request):
@@ -315,33 +335,24 @@ def restocks(request):
     current_store = Store.objects.filter(user__username=request.user).first()
     if request.method == 'GET':
         material_stocks = MaterialStock.objects.filter(store=current_store)
-        response_data = {'materials': []}
-        overall_price = 0
-        for material_stock in material_stocks:
-            added_quantity = material_stock.max_capacity - material_stock.current_capacity
-            if added_quantity == 0:
-                continue            
-            material = material_stock.material
-            total_price = added_quantity * material.price
-            overall_price += total_price
-            response_data['materials'].append({
-                'material': material.pk,
-                'price' : material.price,
-                'restock quantity': added_quantity,
-                'current_capacity': f"{material_stock.current_capacity}/{material_stock.max_capacity}",
-                'total_price': total_price,
-            })
-            response_data['overall_price'] = overall_price
+        serializer = serializersapp.GetRestocksSerializer(material_stocks, many=True)
+        response_data = {
+            'materials': serializer.data,
+            'overall_price': sum([m['total_price'] for m in serializer.data])
+        }
 
-        if len(response_data.get('materials')) == 0:
+        if response_data.get('overall_price') == 0:
             return Response("All material stocks for this store are already full.", status=status.HTTP_204_NO_CONTENT)
         
         return Response(response_data, status=status.HTTP_200_OK)
 
     elif request.method == 'POST':
+        material_stocks = MaterialStock.objects.filter(store=current_store)
+        if all(ms.current_capacity == ms.max_capacity for ms in material_stocks):
+            return Response({"error": "Restocks failed. All material stocks for this store are already full."}, status=status.HTTP_204_NO_CONTENT)
+        
         if not request.data.get('materials'):
             # If user doesn't specify which materials to update, update current_capacity of all MaterialStock objects to their max_capacity
-            material_stocks = MaterialStock.objects.filter(store=current_store)
             response_data = {'materials': []}
             overall_price = 0
             for material_stock in material_stocks:
@@ -350,20 +361,22 @@ def restocks(request):
                     continue
                 material_stock.current_capacity = material_stock.max_capacity
                 material = material_stock.material
+                material_name = material_stock.material.name
                 material_stock.save(update_fields=['current_capacity'])
                 total_price = added_quantity * material.price
                 overall_price += total_price
                 response_data['materials'].append({
                     'material': material.pk,
+                    'material_name': material_name,
                     'quantity': added_quantity,
-                    'current_capacity': material_stock.current_capacity,
+                    'capacity': f"{material_stock.current_capacity}/{material_stock.max_capacity}",
                     'total_price': total_price,
                 })
                 response_data['overall_price'] = overall_price
         
         else:
             # if user specify which material stocks to update, update current_capacity of specified stocks based on given material and quantity.
-            serializer = serializersapp.RestocksSerializer(data=request.data['materials'], many=True, context={'store': current_store})
+            serializer = serializersapp.MultipleRestocksSerializer(data=request.data['materials'], many=True, context={'store': current_store})
 
             if not serializer.is_valid():
                 error_data = {'error': 'Restocks request failed due to invalid data. Please review the following list of invalid restocks',
@@ -375,33 +388,36 @@ def restocks(request):
             for material_data in serializer.validated_data:
                 material_id = material_data['material']
                 added_quantity = material_data['quantity']
+
                 material_stock = MaterialStock.objects.filter(store=current_store, material=material_id).first()
+
                 if material_stock is None:
                     return Response({'error': 'Material stock not found.'}, status=status.HTTP_404_NOT_FOUND)
                 
                 new_capacity = material_stock.current_capacity + added_quantity
+
                 if new_capacity > material_stock.max_capacity:
-                    response_data['materials'].append({
-                    'material': material_id,
-                    'quantity': added_quantity,
-                    'current_capacity': f"{material_stock.current_capacity}/{material_stock.max_capacity}",
-                    'error': 'Restock for this material failed. Adding this amount would exceed maximum capacity.',
-                    })
-                    continue
-                material_stock.current_capacity = new_capacity
+                    return Response({'error': 'The quantity to be restocked is more than the maximum capacity of the material stock.'}, status=status.HTTP_400_BAD_REQUEST)
+
                 material = material_stock.material
-                material_stock.save(update_fields=['current_capacity'])
+                material_name = material.name
                 total_price = added_quantity * material.price
                 overall_price += total_price
+                
+                material_stock.current_capacity = new_capacity
+                material_stock.save(update_fields=['current_capacity'])
+
                 response_data['materials'].append({
                     'material': material_id,
+                    'material_name': material_name,
                     'quantity': added_quantity,
-                    'current_capacity': f"{material_stock.current_capacity}/{material_stock.max_capacity}",
+                    'capacity': f"{material_stock.current_capacity}/{material_stock.max_capacity}",
                     'total_price': total_price,
                 })
             response_data['overall_price'] = overall_price
         return Response(response_data, status=status.HTTP_200_OK)
 
+#----------------------- multisales view -------------------------------
 # Allow multiple product sales in a single JSON POST request using dict list
 @api_view(['POST'])
 def multisales(request):
@@ -413,29 +429,49 @@ def multisales(request):
                       'sales': serializer.errors}
         return Response(error_data, status=status.HTTP_400_BAD_REQUEST)
 
+    response_data = {
+        'success': True,
+        'message': 'Material stocks subtracted successfully',
+        'updated material stocks': []
+        } 
+
     # Loop through each product and subtract the required material from the stock
-    for sale in serializer.validated_data:
-        response_data = {'sales':[]}
+    for sale_index,sale in enumerate(serializer.validated_data):
+        total_subtracted_capacity = 0
         product = get_object_or_404(Product, id=sale['product_id'])
+        
         for material_quantity in product.material_quantity.all():
             material = material_quantity.ingredient
             stock = get_object_or_404(MaterialStock, store=current_store, material=material)
-            if stock.current_capacity < material_quantity.quantity * sale['quantity']:
-                return Response({'error':'Insufficient material stock'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            stock.current_capacity -= material_quantity.quantity * sale['quantity']
-            response_data['sales'].append({
-                'product_id' : sale['product_id'],
-                'quantity' : sale['quantity'],
-                'success' : 'Material stock subtracted successfully',
-                })
+            subtracted_capacity = material_quantity.quantity * sale['quantity']
+            stock.current_capacity -= subtracted_capacity
             stock.save()
+
+            total_subtracted_capacity += subtracted_capacity  # Increment total_subtracted_capacity for each material
+
+            new_response_data = {
+                'id': stock.pk,
+                'material': material.name,
+                'total_subtracted_capacity': total_subtracted_capacity, 
+                'remaining capacity': f'{stock.current_capacity}/{stock.max_capacity}'
+                } 
+            for item in response_data['updated material stocks']:
+                if item['id'] == new_response_data['id']:
+                    item.update(new_response_data)
+                    break
+            else:
+                response_data['updated material stocks'].append(new_response_data)
+
+        # Update total_subtracted_capacity to response_data after each sale
+        response_data['updated material stocks'][sale_index]['total_subtracted_capacity'] = total_subtracted_capacity
 
     return Response(response_data, status=status.HTTP_200_OK)
 
-#///////////////////////////////////////////////////////////////
-#----------------HTML VIEW---------------------------------------
+#===============================================================
+#                   HTML Template Views
+#===============================================================
 
+#----------------------- store_products view -------------------------------
 @login_required(login_url='html_login')
 def store_products(request):
     current_store = Store.objects.filter(user__username=request.user).first()
@@ -447,6 +483,7 @@ def store_products(request):
         'available_products': available_products,
     })
 
+#----------------------- add_product view -------------------------------
 def add_product(request):
     current_store = Store.objects.filter(user__username=request.user).first()
     if request.method == 'POST':
@@ -459,6 +496,7 @@ def add_product(request):
         form = forms.AddProductForm()
     return render("Something went wrong when adding product.")
 
+#----------------------- delete_product view -------------------------------
 def delete_product(request, product_id):
     current_store = Store.objects.filter(user__username=request.user).first()
     product = get_object_or_404(Product, pk=product_id, product_stores=current_store)
@@ -471,6 +509,7 @@ def delete_product(request, product_id):
         form = forms.DeleteProductForm()
     return render("Something went wrong when deleting product.")
 
+#----------------------- MaterialStockView view -------------------------------
 class MaterialStockView(LoginRequiredMixin, generic.TemplateView):
     template_name = 'material_stocks.html'
     login_url = 'html_login'
@@ -483,6 +522,7 @@ class MaterialStockView(LoginRequiredMixin, generic.TemplateView):
         context['material_stocks'] = material_stocks
         return context
     
+#----------------------- MaterialStockCreateView view -------------------------------
 class MaterialStockCreateView(generic.CreateView):
     model = MaterialStock
     form_class = forms.MaterialStockAddForm
@@ -507,6 +547,7 @@ class MaterialStockCreateView(generic.CreateView):
     def get_success_url(self):
         return reverse_lazy('store_stocks')
     
+#----------------------- MaterialStockUpdateView view -------------------------------
 class MaterialStockUpdateView(generic.UpdateView):
     model = MaterialStock
     form_class = forms.MaterialStockUpdateForm
@@ -518,6 +559,7 @@ class MaterialStockUpdateView(generic.UpdateView):
     def get_success_url(self):
         return reverse_lazy('store_stocks')
 
+#----------------------- MaterialStockDeleteView view -------------------------------
 class MaterialStockDeleteView(generic.DeleteView):
     model = MaterialStock
     template_name = 'material_stock_delete.html'
