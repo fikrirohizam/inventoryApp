@@ -62,7 +62,10 @@ class RestocksViewTestCase(APITestCase):
         stock2.refresh_from_db()
         self.assertEqual(stock2.current_capacity, 210)
 
+
     def test_add_no_materials(self):
+        # Test that when an empty POST request is sent, 
+        # all material stocks are restocked to their maximum capacity
         self.authenticate()
         material1 = MaterialFactory.create(price=100.0)
         stock1 = MaterialStockFactory(material=material1, store=self.store, current_capacity=50, max_capacity=100)
