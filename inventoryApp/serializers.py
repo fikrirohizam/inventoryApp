@@ -84,13 +84,13 @@ class ProductSerializer(serializers.ModelSerializer):
     
 class ProductCapacitySerializer(serializers.ModelSerializer):
     products = ProductSerializer(many=True)
-    material_stock = serializers.SerializerMethodField()
+    remaining_capacities = serializers.SerializerMethodField()
 
     class Meta:
         model = models.Store
-        fields = ['store_name', 'products', 'material_stock']
+        fields = ['store_name', 'products', 'remaining_capacities']
 
-    def get_material_stock(self, store):
+    def get_remaining_capacities(self, store):
         material_stocks = models.MaterialStock.objects.filter(store=store)
         product_data = []
 
@@ -138,15 +138,15 @@ class SalesSerializer(serializers.Serializer):
             except models.MaterialStock.DoesNotExist:
                 raise serializers.ValidationError({'product_id': product_id, 
                                                    'non_field_errors': 'Store does not have the required material in stock'})
-            else:
-                if stock.current_capacity < material_quantity.quantity * data['quantity']:
-                    raise serializers.ValidationError({'product_id': product_id, 
-                                                       'non_field_errors': 'Insufficient material stock'})
+            
+            if stock.current_capacity < material_quantity.quantity * data['quantity']:
+                raise serializers.ValidationError({'product_id': product_id, 
+                                                   'non_field_errors': 'Insufficient material stock'})
 
         return data
 
 
-class RestocksSerializer(serializers.Serializer):
+class MultipleRestocksSerializer(serializers.Serializer):
     material = serializers.IntegerField()
     quantity = serializers.IntegerField()
 
@@ -168,4 +168,23 @@ class RestocksSerializer(serializers.Serializer):
 
         return data
     
+class GetRestocksSerializer(serializers.ModelSerializer):
+    material = serializers.PrimaryKeyRelatedField(queryset=models.Material.objects.all())
+    material_name = serializers.StringRelatedField(source='material.name')
+    quantity = serializers.SerializerMethodField()
+    capacity = serializers.SerializerMethodField()
+    total_price = serializers.SerializerMethodField()
 
+    class Meta:
+        model = models.MaterialStock
+        fields = ('material', 'material_name', 'quantity', 'capacity', 'total_price')
+
+    def get_quantity(self, obj):
+        quantity = obj.max_capacity - obj.current_capacity
+        return quantity if quantity > 0 else 0
+    
+    def get_capacity(self, obj):
+        return f'{obj.current_capacity}/{obj.max_capacity}'
+    
+    def get_total_price(self, obj):
+        return obj.material.price * self.get_quantity(obj)
