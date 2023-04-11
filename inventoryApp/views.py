@@ -419,53 +419,62 @@ def restocks(request):
 
 #----------------------- multisales view -------------------------------
 # Allow multiple product sales in a single JSON POST request using dict list
-@api_view(['POST'])
+@api_view(['GET', 'POST'])
 def multisales(request):
     current_store = Store.objects.filter(user__username=request.user).first()
-    serializer = serializersapp.SalesSerializer(data=request.data['sales'], context={'store':current_store}, many=True)
 
-    if not serializer.is_valid():
-        error_data = {'error': 'Sales request failed due to invalid data. Please review the following list of invalid sales',
-                      'sales': serializer.errors}
-        return Response(error_data, status=status.HTTP_400_BAD_REQUEST)
+    if request.method == 'GET':
+        queryset = Product.objects.filter(product_stores=current_store).order_by('pk')
+        serializer = serializersapp.ProductSerializer(queryset, many=True)
+        response_data = {'Products available in this store:':[serializer.data]}
+        return Response(response_data, status=status.HTTP_200_OK)
 
-    response_data = {
-        'success': True,
-        'message': 'Material stocks subtracted successfully',
-        'updated material stocks': []
-        } 
 
-    # Loop through each product and subtract the required material from the stock
-    for sale_index,sale in enumerate(serializer.validated_data):
-        total_subtracted_capacity = 0
-        product = get_object_or_404(Product, id=sale['product_id'])
-        
-        for material_quantity in product.material_quantity.all():
-            material = material_quantity.ingredient
-            stock = get_object_or_404(MaterialStock, store=current_store, material=material)
-            subtracted_capacity = material_quantity.quantity * sale['quantity']
-            stock.current_capacity -= subtracted_capacity
-            stock.save()
+    elif request.method == 'POST':
+        serializer = serializersapp.SalesSerializer(data=request.data['sales'], context={'store':current_store}, many=True)
 
-            total_subtracted_capacity += subtracted_capacity  # Increment total_subtracted_capacity for each material
+        if not serializer.is_valid():
+            error_data = {'error': 'Sales request failed due to invalid data. Please review the following list of invalid sales',
+                        'sales': serializer.errors}
+            return Response(error_data, status=status.HTTP_400_BAD_REQUEST)
 
-            new_response_data = {
-                'id': stock.pk,
-                'material': material.name,
-                'total_subtracted_capacity': total_subtracted_capacity, 
-                'remaining capacity': f'{stock.current_capacity}/{stock.max_capacity}'
-                } 
-            for item in response_data['updated material stocks']:
-                if item['id'] == new_response_data['id']:
-                    item.update(new_response_data)
-                    break
-            else:
-                response_data['updated material stocks'].append(new_response_data)
+        response_data = {
+            'success': True,
+            'message': 'Material stocks subtracted successfully',
+            'updated material stocks': []
+            } 
 
-        # Update total_subtracted_capacity to response_data after each sale
-        response_data['updated material stocks'][sale_index]['total_subtracted_capacity'] = total_subtracted_capacity
+        # Loop through each product and subtract the required material from the stock
+        for sale_index, sale in enumerate(serializer.validated_data):
+            total_subtracted_capacity = 0
+            product = get_object_or_404(Product, id=sale['product_id'])
 
-    return Response(response_data, status=status.HTTP_200_OK)
+            for material_quantity in product.material_quantity.all():
+                material = material_quantity.ingredient
+                stock = get_object_or_404(MaterialStock, store=current_store, material=material)
+                subtracted_capacity = material_quantity.quantity * sale['quantity']
+                stock.current_capacity -= subtracted_capacity
+                stock.save()
+
+                total_subtracted_capacity += subtracted_capacity  # Increment total_subtracted_capacity for each material
+
+                new_response_data = {
+                    'id': stock.pk,
+                    'material': material.name,
+                    'total_subtracted_capacity': total_subtracted_capacity, 
+                    'remaining capacity': f'{stock.current_capacity}/{stock.max_capacity}'
+                    } 
+                for item in response_data['updated material stocks']:
+                    if item['id'] == new_response_data['id']:
+                        item.update(new_response_data)
+                        break
+                else:
+                    response_data['updated material stocks'].append(new_response_data)
+
+            # Update total_subtracted_capacity to response_data after each sale
+            response_data['updated material stocks'][sale_index]['total_subtracted_capacity'] = total_subtracted_capacity
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
 #===============================================================
 #                   HTML Template Views
