@@ -22,7 +22,7 @@ class ProductCapacitySerializerTestCase(APITestCase):
         self.user = User.objects.get(user_id=1)
         self.client.force_authenticate(self.user)
 
-    def test_store_serializer(self):
+    def test_product_capacity_serializer(self):
         self.authenticate()
         serializer = ProductCapacitySerializer(instance=self.store, context={'currentstore':self.store})
 
@@ -41,7 +41,7 @@ class ProductCapacitySerializerTestCase(APITestCase):
                     ]
                 }
             ],
-            'material_stock': [
+            'remaining_capacities': [
                 {
                     'product_name': self.product1.name,
                     'product_material_with_lowest_stock': {
@@ -93,7 +93,7 @@ class ProductCapacityViewTestCase(APITestCase):
                     ]
                 }
             ],
-            'material_stock': [
+            'remaining_capacities': [
                 {
                     'product_name': self.product1.name,
                     'product_material_with_lowest_stock': {
@@ -118,9 +118,9 @@ class ProductCapacityViewTestCase(APITestCase):
         self.assertEqual(response.data['products'][0]['material_quantity'][0]['ingredient'], self.material_quantity1.ingredient.pk)
 
         # Values for 'material_stock' key
-        self.assertEqual(response.data['material_stock'][0]['product_name'], self.product1.name)
+        self.assertEqual(response.data['remaining_capacities'][0]['product_name'], self.product1.name)
         # Values for 'product_material_with_lowest_stock' key
-        self.assertEqual(response.data['material_stock'][0]['product_material_with_lowest_stock']['material_name'], self.material.name)
-        self.assertEqual(response.data['material_stock'][0]['product_material_with_lowest_stock']['stock_capacity'], self.material_stock.current_capacity)
-        self.assertEqual(response.data['material_stock'][0]['product_material_with_lowest_stock']['material_quantity_each'], self.material_quantity1.quantity)
-        self.assertEqual(response.data['material_stock'][0]['product_material_with_lowest_stock']['product_quantity'], int(self.material_stock.current_capacity / self.material_quantity1.quantity))
+        self.assertEqual(response.data['remaining_capacities'][0]['product_material_with_lowest_stock']['material_name'], self.material.name)
+        self.assertEqual(response.data['remaining_capacities'][0]['product_material_with_lowest_stock']['stock_capacity'], self.material_stock.current_capacity)
+        self.assertEqual(response.data['remaining_capacities'][0]['product_material_with_lowest_stock']['material_quantity_each'], self.material_quantity1.quantity)
+        self.assertEqual(response.data['remaining_capacities'][0]['product_material_with_lowest_stock']['product_quantity'], int(self.material_stock.current_capacity / self.material_quantity1.quantity))
