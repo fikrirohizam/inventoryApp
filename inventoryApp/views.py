@@ -207,7 +207,7 @@ def sales(request):
 
 
          
-            return Response('response_data', status=status.HTTP_200_OK)
+            return Response('success', status=status.HTTP_200_OK)
 
 #----------------------- MaterialStockListAPIView view -------------------------------
 class MaterialStockListAPIView(generics.ListCreateAPIView):
