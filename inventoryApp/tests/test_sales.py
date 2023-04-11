@@ -37,9 +37,30 @@ class MultiSalesTestCase(APITestCase):
                 {'product_id': self.product2.id, 'quantity': 10}
             ]
         }
+
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['sales'][0]['success'], 'Material stock subtracted successfully')
+
+        expected_data = {
+            "success": True,
+            "message": "Material stocks subtracted successfully",
+            "updated material stocks": [
+                {
+                    "id": 1,
+                    "material": self.material1.name,
+                    "total_subtracted_capacity": 10,
+                    "remaining capacity": "490/1000"
+                },
+                {
+                    "id": 2,
+                    "material": self.material2.name,
+                    "total_subtracted_capacity": 100,
+                    "remaining capacity": "400/1000"
+                }
+            ]
+        }
+
+        self.assertEqual(response.data, expected_data)
         # Check that material stock has been updated
         self.material_stock1.refresh_from_db()
         self.material_stock2.refresh_from_db()
@@ -146,7 +167,7 @@ class SalesViewTestCase(APITestCase):
         }
         response = self.client.post(reverse('sales'), data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['success'], 'Material stock subtracted successfully')
+        self.assertEqual(response.data, 'success')
 
     def test_insufficient_material_stock(self):
         self.authenticate()
