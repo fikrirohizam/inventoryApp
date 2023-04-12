@@ -1,27 +1,23 @@
-from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse, reverse_lazy
-from inventoryApp import forms
-from .models import MaterialStock, Store, Product
-from inventoryApp import serializers as serializersapp
-from rest_framework.authtoken.views import ObtainAuthToken
-from rest_framework import generics
-from django.views import generic
-from rest_framework import status
-from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
-from .authentication import token_expire_handler, expires_in
-from rest_framework.authtoken.models import Token
-from django.contrib import messages
-from rest_framework import serializers
-from django.contrib.auth import authenticate, login
-from django.views.decorators.csrf import csrf_exempt
-from rest_framework.decorators import api_view, permission_classes
-from django.db.models import F
+from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib.auth import logout
+from django.db.models import F
 from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse, reverse_lazy
+from django.views import generic
+from django.views.decorators.csrf import csrf_exempt
+from inventoryApp import forms
+from inventoryApp import serializers as serializersapp
+from rest_framework import generics, serializers, status
+from rest_framework.authtoken.models import Token
+from rest_framework.authtoken.views import ObtainAuthToken
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
 
+from .authentication import expires_in, token_expire_handler
+from .models import MaterialStock, Product, Store
 
 #===============================================================
 #                   login, logout and token
@@ -104,45 +100,6 @@ class CustomAuthToken(ObtainAuthToken):
 #                       DRF Views
 #===============================================================
 
-#----------------------- restock view -------------------------------
-@api_view(['GET', 'POST'])
-def restock(request):
-    """
-    List all materials, quantity, and total price, or create a new one (restock).
-    """
-    current_store = Store.objects.get(user__username=request.user)
-    if request.method == 'GET':
-
-        serializer = serializersapp.RestockGetSerializer(current_store.stocks.all(), many=True)
-
-        return Response(serializer.data)
-
-    elif request.method == 'POST':
-        current_store = Store.objects.filter(user__username=request.user).first()
-        serializer = serializersapp.RestockPostSerializer(data=request.data)
-        if serializer.is_valid():
-            material_id = serializer.validated_data['material']
-            add_value = serializer.validated_data['quantity']
-            try:
-                material_stock = MaterialStock.objects.get(store=current_store, material=material_id)
-            except MaterialStock.DoesNotExist:
-                return Response({'error': 'Material stock not found.'}, status=status.HTTP_404_NOT_FOUND)
-            new_capacity = material_stock.current_capacity + add_value
-            if new_capacity > material_stock.max_capacity:
-                return Response({'error': 'Adding this amount would exceed maximum capacity.'}, status=status.HTTP_400_BAD_REQUEST)
-            material_stock.current_capacity = new_capacity
-            material = material_stock.material
-            material_stock.save()
-            total_price = add_value * material.price
-            response_data = {
-                'material': material_id,
-                'quantity': add_value,
-                'current_capacity': new_capacity,
-                'total_price': total_price,
-            }
-            return Response(response_data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 #----------------------- inventory view -------------------------------
 @api_view(['GET',])
 def inventory(request):
@@ -166,48 +123,6 @@ def product_capacity(request):
         materialstock = Product.objects.all()
         serializer = serializersapp.ProductCapacitySerializer(current_store)
         return Response(serializer.data)
-
-#----------------------- sales view -------------------------------
-@api_view(['POST'])
-def sales(request):
-    """
-    POST request to record the sale of a 'product' and its 'quantity'.
-    This view updates the corresponding MaterialStocks based on the
-    product's material requirements and the quantity sold. The material
-    stocks will be reduced accordingly.
-    """ 
-    if request.method == 'POST':
-        current_store = Store.objects.filter(user__username=request.user).first()
-        serializer = serializersapp.SalesSerializer(data=request.data, context={'store':current_store})
-
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        else:
-            product_id = serializer.validated_data['product_id']
-            quantity = serializer.validated_data['quantity']
-
-            
-            # Get the store and product objects
-            try:
-                product = Product.objects.get(id=product_id)
-            except (Product.DoesNotExist):
-                return Response({'error': 'Invalid product id'}, status=status.HTTP_400_BAD_REQUEST)
-
-            # Loop through each MaterialQuantity object and subtract the material from the stock
-            for material_quantity in product.material_quantity.all():
-                material = material_quantity.ingredient
-                try:
-                    stock = MaterialStock.objects.get(store=current_store, material=material)
-                except MaterialStock.DoesNotExist:
-                    return Response({'error': 'Store does not have the required material in stock'}, status=status.HTTP_400_BAD_REQUEST)
-
-                stock.current_capacity -= material_quantity.quantity * quantity
-                stock.save()
-
-
-         
-            return Response('success', status=status.HTTP_200_OK)
 
 #----------------------- MaterialStockListAPIView view -------------------------------
 class MaterialStockListAPIView(generics.ListCreateAPIView):
@@ -325,17 +240,17 @@ class ProductDeleteAPIView(generics.RetrieveDestroyAPIView):
         instance.delete()
 
 
-#----------------------- restocks view -------------------------------
+#----------------------- restock view -------------------------------
 # Allow multiple material restocking in a single JSON POST request using dict list
 @api_view(['GET', 'POST'])
-def restocks(request):
+def restock(request):
     """
-    List all material stocks, price for restocking, and amount of restocks.
+    List all material stocks, price for restocking, and amount of restock.
     """
     current_store = Store.objects.filter(user__username=request.user).first()
     if request.method == 'GET':
         material_stocks = MaterialStock.objects.filter(store=current_store)
-        serializer = serializersapp.GetRestocksSerializer(material_stocks, many=True)
+        serializer = serializersapp.GetRestockSerializer(material_stocks, many=True)
         response_data = {
             'materials': serializer.data,
             'overall_price': sum([m['total_price'] for m in serializer.data])
@@ -376,10 +291,10 @@ def restocks(request):
         
         else:
             # if user specify which material stocks to update, update current_capacity of specified stocks based on given material and quantity.
-            serializer = serializersapp.MultipleRestocksSerializer(data=request.data['materials'], many=True, context={'store': current_store})
+            serializer = serializersapp.PostRestockSerializer(data=request.data['materials'], many=True, context={'store': current_store})
 
             if not serializer.is_valid():
-                error_data = {'error': 'Restocks request failed due to invalid data. Please review the following list of invalid restocks',
+                error_data = {'error': 'Restocks request failed due to invalid data. Please review the following list of invalid restock',
                               'materials': serializer.errors}
                 return Response(error_data, status=status.HTTP_400_BAD_REQUEST)
                         
@@ -417,10 +332,10 @@ def restocks(request):
             response_data['overall_price'] = overall_price
         return Response(response_data, status=status.HTTP_200_OK)
 
-#----------------------- multisales view -------------------------------
+#----------------------- sales view -------------------------------
 # Allow multiple product sales in a single JSON POST request using dict list
 @api_view(['GET', 'POST'])
-def multisales(request):
+def sales(request):
     current_store = Store.objects.filter(user__username=request.user).first()
 
     if request.method == 'GET':
