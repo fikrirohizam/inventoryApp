@@ -1,19 +1,19 @@
 from django.urls import reverse, reverse_lazy
 from rest_framework import status
 from rest_framework.test import APITestCase
-from ..models import Store, Material, MaterialStock, User
-from ..serializers import ProductSerializer
-from ..factories import MaterialFactory, MaterialQuantityFactory, MaterialStockFactory, ProductFactory, StoreFactory
+from inventoryApp.models import User
+from inventoryApp.serializers import ProductSerializer
+from inventoryApp import factories
 
 class ProductListAPIViewTestCase(APITestCase):
     url = reverse('products')
 
     def setUp(self):
         self.user = User.objects.create(user_id=1)
-        self.store = StoreFactory(user=self.user)
-        self.material = MaterialFactory()
-        self.material_quantity = MaterialQuantityFactory(ingredient=self.material)
-        self.product = ProductFactory()
+        self.store = factories.StoreFactory(user=self.user)
+        self.material = factories.MaterialFactory()
+        self.material_quantity = factories.MaterialQuantityFactory(ingredient=self.material)
+        self.product = factories.ProductFactory()
 
         self.product.material_quantity.add(self.material_quantity)
         self.store.products.add(self.product)

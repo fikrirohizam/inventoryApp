@@ -1,19 +1,18 @@
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-from ..models import Store, Material, MaterialStock, User
-from ..serializers import ProductCapacitySerializer
-from ..factories import MaterialFactory, MaterialQuantityFactory, MaterialStockFactory, ProductFactory, StoreFactory
-
+from inventoryApp.models import User
+from inventoryApp.serializers import ProductCapacitySerializer
+from inventoryApp import factories
 class ProductCapacitySerializerTestCase(APITestCase):
 
     def setUp(self):
         self.user = User.objects.create(user_id=1)
-        self.material = MaterialFactory()
-        self.product1 = ProductFactory()
-        self.material_quantity1 = MaterialQuantityFactory(ingredient=self.material)
-        self.store = StoreFactory(user=self.user)
-        self.material_stock = MaterialStockFactory(material=self.material, store=self.store)
+        self.material = factories.MaterialFactory()
+        self.product1 = factories.ProductFactory()
+        self.material_quantity1 = factories.MaterialQuantityFactory(ingredient=self.material)
+        self.store = factories.StoreFactory(user=self.user)
+        self.material_stock = factories.MaterialStockFactory(material=self.material, store=self.store)
 
         self.store.products.add(self.product1)
         self.product1.material_quantity.add(self.material_quantity1)
@@ -60,11 +59,11 @@ class ProductCapacityViewTestCase(APITestCase):
 
     def setUp(self):
         self.user = User.objects.create(user_id=1)
-        self.material = MaterialFactory()
-        self.product1 = ProductFactory()
-        self.material_quantity1 = MaterialQuantityFactory(ingredient=self.material)
-        self.store = StoreFactory(user=self.user)
-        self.material_stock = MaterialStockFactory(material=self.material, store=self.store)
+        self.material = factories.MaterialFactory()
+        self.product1 = factories.ProductFactory()
+        self.material_quantity1 = factories.MaterialQuantityFactory(ingredient=self.material)
+        self.store = factories.StoreFactory(user=self.user)
+        self.material_stock = factories.MaterialStockFactory(material=self.material, store=self.store)
 
         self.store.products.add(self.product1)
         self.product1.material_quantity.add(self.material_quantity1)

@@ -1,25 +1,24 @@
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-from ..models import User
-from ..serializers import SalesSerializer
-from ..factories import MaterialFactory, MaterialQuantityFactory, MaterialStockFactory, ProductFactory, StoreFactory
+from inventoryApp.models import User
+from inventoryApp import factories
 
-class MultiSalesTestCase(APITestCase):
-    url = reverse('multisales')
+class SalesTestCase(APITestCase):
+    url = reverse('sales')
 
     def setUp(self):
         self.user = User.objects.create(user_id=1)
-        self.store = StoreFactory(user=self.user)
+        self.store = factories.StoreFactory(user=self.user)
 
-        self.material1 = MaterialFactory()
-        self.material2 = MaterialFactory()
-        self.product1 = ProductFactory()
-        self.product2 = ProductFactory()
-        self.material_quantity1 = MaterialQuantityFactory(ingredient=self.material1, quantity=5)
-        self.material_quantity2 = MaterialQuantityFactory(ingredient=self.material2, quantity=10)
-        self.material_stock1 = MaterialStockFactory(store=self.store, material=self.material_quantity1.ingredient, current_capacity=500, max_capacity=1000)
-        self.material_stock2 = MaterialStockFactory(store=self.store, material=self.material_quantity2.ingredient, current_capacity=500, max_capacity=1000)
+        self.material1 = factories.MaterialFactory()
+        self.material2 = factories.MaterialFactory()
+        self.product1 = factories.ProductFactory()
+        self.product2 = factories.ProductFactory()
+        self.material_quantity1 = factories.MaterialQuantityFactory(ingredient=self.material1, quantity=5)
+        self.material_quantity2 = factories.MaterialQuantityFactory(ingredient=self.material2, quantity=10)
+        self.material_stock1 = factories.MaterialStockFactory(store=self.store, material=self.material_quantity1.ingredient, current_capacity=500, max_capacity=1000)
+        self.material_stock2 = factories.MaterialStockFactory(store=self.store, material=self.material_quantity2.ingredient, current_capacity=500, max_capacity=1000)
         
         self.store.products.add(self.product1, self.product2)
         self.product1.material_quantity.add(self.material_quantity1)
@@ -29,7 +28,7 @@ class MultiSalesTestCase(APITestCase):
         self.user = User.objects.get(user_id=1)
         self.client.force_authenticate(self.user)
 
-    def test_multisales_with_valid_data(self):
+    def test_sales_with_valid_data(self):
         self.authenticate()
         data = {
             'sales': [
@@ -67,9 +66,9 @@ class MultiSalesTestCase(APITestCase):
         self.assertEqual(self.material_stock1.current_capacity, 490)
         self.assertEqual(self.material_stock2.current_capacity, 400)
 
-        self.material = MaterialFactory()
+        self.material = factories.MaterialFactory()
 
-    def test_multisales_with_invalid_product_id(self):
+    def test_sales_with_invalid_product_id(self):
         self.authenticate()
         data = {
             'sales': [
@@ -83,7 +82,7 @@ class MultiSalesTestCase(APITestCase):
                          'Sales request failed due to invalid data. Please review the following list of invalid sales')
         self.assertIn(response.data['sales'][0]['non_field_errors'][0], 'Invalid product id')
         
-    def test_multisales_with_insufficient_stock(self):
+    def test_sales_with_insufficient_stock(self):
         self.authenticate()
         # Reduce the stock capacity so that it's not enough to fulfill the sales
         self.material_stock1.current_capacity = 2
@@ -99,85 +98,3 @@ class MultiSalesTestCase(APITestCase):
         self.assertEqual(response.data['error'], 
                          'Sales request failed due to invalid data. Please review the following list of invalid sales')
         self.assertIn(response.data['sales'][0]['non_field_errors'][0], 'Insufficient material stock')
-        
-class SalesSerializerTestCase(APITestCase):
-    def setUp(self):
-        self.user = User.objects.create(user_id=1)
-        self.material = MaterialFactory()
-        self.product = ProductFactory()
-        self.material_quantity = MaterialQuantityFactory(ingredient=self.material)
-        self.store = StoreFactory(user=self.user)
-        self.material_stock = MaterialStockFactory(material=self.material, store=self.store)
-
-        self.store.products.add(self.product)
-        self.product.material_quantity.add(self.material_quantity)
-
-    def authenticate(self):
-        self.user = User.objects.get(user_id=1)
-        self.client.force_authenticate(self.user)
-
-    def test_invalid_product_id(self):
-        self.authenticate()
-
-        data = {
-            'product_id': 999,
-            'quantity': 1
-        }
-        serializer = SalesSerializer(data=data, context={'store':self.store})
-        self.assertFalse(serializer.is_valid())
-        self.assertEqual(serializer.errors['non_field_errors'][0], 'Invalid product id')
-
-    def test_insufficient_material_stock(self):
-        self.authenticate()
-        self.material_stock.current_capacity = 0
-        self.material_stock.save()
-
-        data = {
-            'product_id': self.product.id,
-            'quantity': 1
-        }
-        serializer = SalesSerializer(data=data, context={'store':self.store})
-        self.assertFalse(serializer.is_valid())
-        self.assertEqual(serializer.errors['non_field_errors'][0], 'Insufficient material stock')
-
-class SalesViewTestCase(APITestCase):
-    def setUp(self):
-        self.user = User.objects.create(user_id=1)
-        self.material = MaterialFactory()
-        self.product = ProductFactory()
-        self.material_quantity = MaterialQuantityFactory(ingredient=self.material)
-        self.store = StoreFactory(user=self.user)
-        self.material_stock = MaterialStockFactory(material=self.material, store=self.store)
-
-        self.store.products.add(self.product)
-        self.product.material_quantity.add(self.material_quantity)
-
-    def authenticate(self):
-        self.user = User.objects.get(user_id=1)
-        self.client.force_authenticate(self.user)
-
-    def test_valid_sales(self):
-        self.authenticate()
-        self.material_stock.max_capacity = 1000
-        self.material_stock.current_capacity = self.material_stock.max_capacity
-        self.material_stock.save()
-        data = {
-            'product_id': self.product.id,
-            'quantity': 1
-        }
-        response = self.client.post(reverse('sales'), data)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, 'success')
-
-    def test_insufficient_material_stock(self):
-        self.authenticate()
-        self.material_stock.current_capacity = 0
-        self.material_stock.save()
-
-        data = {
-            'product_id': self.product.id,
-            'quantity': 1000
-        }
-        response = self.client.post(reverse('sales'), data)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data['non_field_errors'][0], 'Insufficient material stock')

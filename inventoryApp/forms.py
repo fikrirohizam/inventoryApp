@@ -1,15 +1,15 @@
 from django import forms
-from .models import Product, MaterialStock, Material, Store
+from inventoryApp import models
 
 class AddProductForm(forms.Form):
-    product = forms.ModelChoiceField(queryset=Product.objects.all())
+    product = forms.ModelChoiceField(queryset=models.Product.objects.all())
 
 class DeleteProductForm(forms.Form):
     pass
 
 class MaterialStockUpdateForm(forms.ModelForm):
     class Meta:
-        model = MaterialStock
+        model = models.MaterialStock
         fields = ['max_capacity']
 
     def clean_max_capacity(self):
@@ -21,16 +21,16 @@ class MaterialStockUpdateForm(forms.ModelForm):
     
 class MaterialStockAddForm(forms.ModelForm):
     class Meta:
-        model = MaterialStock
+        model = models.MaterialStock
         exclude = ['store']
 
     def __init__(self, *args, **kwargs):
         store_id = kwargs.pop('store_id', None)
         super().__init__(*args, **kwargs)
         if store_id:
-            store = Store.objects.get(pk=store_id)
+            store = models.Store.objects.get(pk=store_id)
             used_material_ids = store.stocks.values_list('material__material_id', flat=True)
-            available_materials = Material.objects.exclude(material_id__in=used_material_ids)
+            available_materials = models.Material.objects.exclude(material_id__in=used_material_ids)
             if available_materials:
                 self.fields['material'].queryset = available_materials
             else:

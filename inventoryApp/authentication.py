@@ -1,10 +1,9 @@
+from datetime import timedelta
+from django.conf import settings
+from django.utils import timezone
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import AuthenticationFailed
-
-from datetime import timedelta
-from django.utils import timezone
-from django.conf import settings
 
 
 #this return left time

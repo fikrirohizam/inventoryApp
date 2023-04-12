@@ -1,15 +1,15 @@
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-from ..models import User
-from ..serializers import InventorySerializer
-from ..factories import MaterialStockFactory, StoreFactory
+from inventoryApp.models import User
+from inventoryApp.serializers import InventorySerializer
+from inventoryApp import factories
 
 class InventorySerializerTestCase(APITestCase):
     def setUp(self):
         self.user = User.objects.create(user_id=1)
-        self.store = StoreFactory.create(user=self.user)
-        self.material_stock = MaterialStockFactory.create(store=self.store)
+        self.store = factories.StoreFactory.create(user=self.user)
+        self.material_stock = factories.MaterialStockFactory.create(store=self.store)
         self.serializer = InventorySerializer(instance=self.material_stock, context={'request': self.user})
 
     def authenticate(self):
@@ -30,8 +30,8 @@ class InventoryViewTestCase(APITestCase):
 
     def setUp(self):
         self.user = User.objects.create(user_id=1)
-        self.store = StoreFactory.create(user=self.user)
-        self.material_stock = MaterialStockFactory.create(store=self.store)
+        self.store = factories.StoreFactory.create(user=self.user)
+        self.material_stock = factories.MaterialStockFactory.create(store=self.store)
         self.serializer = InventorySerializer(instance=self.material_stock, context={'request': self.user})
 
     def authenticate(self):
