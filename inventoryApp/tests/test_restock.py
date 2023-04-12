@@ -1,17 +1,17 @@
 from django.urls import reverse
+from inventoryApp import factories, models, serializers
 from rest_framework import status
 from rest_framework.test import APITestCase
-from inventoryApp.models import User
-from inventoryApp import factories
+
 
 class RestockViewTestCase(APITestCase):
     def setUp(self):
-        self.user = User.objects.create(user_id=1)
+        self.user = models.User.objects.create(user_id=1)
         self.store = factories.StoreFactory(user=self.user)
         self.url = reverse('restock')
 
     def authenticate(self):
-        self.user = User.objects.get(user_id=1)
+        self.user = models.User.objects.get(user_id=1)
         self.client.force_authenticate(self.user)
 
     def test_add_single_material(self):
@@ -85,3 +85,26 @@ class RestockViewTestCase(APITestCase):
         stock2.refresh_from_db()
         self.assertEqual(stock2.current_capacity, 50)
 
+class PostRestockSerializerTestCase(APITestCase):
+    def setUp(self):
+        self.store = factories.StoreFactory.create(store_name='Test Store')
+        self.material = factories.MaterialFactory.create(name='Test Material', price=10)
+        self.material_stock = factories.MaterialStockFactory.create(store=self.store, material=self.material, current_capacity=5, max_capacity=10)
+
+    def test_valid_data(self):
+        data = {'material': self.material.pk, 'quantity': 3}
+        serializer = serializers.PostRestockSerializer(data=data, context={'store': self.store})
+        self.assertTrue(serializer.is_valid())
+        self.assertEqual(serializer.validated_data, data)
+
+    def test_invalid_material(self):
+        data = {'material': 999, 'quantity': 3}
+        serializer = serializers.PostRestockSerializer(data=data, context={'store': self.store})
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(str(serializer.errors['non_field_errors']), "[ErrorDetail(string='Invalid product id', code='invalid')]")
+
+    def test_insufficient_capacity(self):
+        data = {'material': self.material.pk, 'quantity': 722}
+        serializer = serializers.PostRestockSerializer(data=data, context={'store': self.store})
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(str(serializer.errors['non_field_errors']), "[ErrorDetail(string='The quantity to be restocked is more than the maximum capacity of the material stock.', code='invalid')]")
