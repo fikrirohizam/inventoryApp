@@ -1,7 +1,5 @@
 from inventoryApp import models
 from rest_framework import serializers
-from django.db.models import Sum
-from django.db.models import F
 
 class UserSigninSerializer(serializers.Serializer):
     username = serializers.CharField(required = True)
@@ -16,31 +14,6 @@ class MaterialQuantitySerializer2(serializers.ModelSerializer):
 
     def get_material(self,obj):
         return obj.ingredient.material_id
-   
-class RestockGetSerializer2(serializers.Serializer):    
-    materials = serializers.SerializerMethodField()
-    total_price = serializers.SerializerMethodField()
-
-    class Meta:
-        fields = ('materials', 'total_price')
-
-    def get_materials(self, instance):
-        return MaterialQuantitySerializer2(models.MaterialQuantity.objects.all(),many=True).data
-    
-    def get_total_price(self, instance):
-        quantitysum = models.MaterialQuantity.objects.aggregate(result=Sum(F('ingredient__price')* F('quantity')))
-        return next(iter(quantitysum.values()))
-    
-class RestockGetSerializer(serializers.ModelSerializer):
-    material_name = serializers.CharField(source='material.name')
-    material_price = serializers.DecimalField(source='material.price', max_digits=10, decimal_places=2)
-    class Meta:
-        model = models.MaterialStock
-        fields = ['material_name', 'material_price', 'max_capacity', 'current_capacity']
-        
-class RestockPostSerializer(serializers.Serializer):
-    material = serializers.IntegerField()
-    quantity = serializers.IntegerField()
 
 class MaterialStockSerializer(serializers.ModelSerializer):
     material_name = serializers.StringRelatedField(source='material.name')
@@ -142,11 +115,10 @@ class SalesSerializer(serializers.Serializer):
             if stock.current_capacity < material_quantity.quantity * data['quantity']:
                 raise serializers.ValidationError({'product_id': product_id, 
                                                    'non_field_errors': 'Insufficient material stock'})
-
         return data
 
 
-class MultipleRestocksSerializer(serializers.Serializer):
+class PostRestockSerializer(serializers.Serializer):
     material = serializers.IntegerField()
     quantity = serializers.IntegerField()
 
@@ -165,10 +137,9 @@ class MultipleRestocksSerializer(serializers.Serializer):
             raise serializers.ValidationError({'material': material,
                                                'quantity': quantity,
                                                'non_field_errors': 'The quantity to be restocked is more than the maximum capacity of the material stock.'})
-
         return data
     
-class GetRestocksSerializer(serializers.ModelSerializer):
+class GetRestockSerializer(serializers.ModelSerializer):
     material = serializers.PrimaryKeyRelatedField(queryset=models.Material.objects.all())
     material_name = serializers.StringRelatedField(source='material.name')
     quantity = serializers.SerializerMethodField()
