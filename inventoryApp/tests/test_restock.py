@@ -108,3 +108,26 @@ class PostRestockSerializerTestCase(APITestCase):
         serializer = serializers.PostRestockSerializer(data=data, context={'store': self.store})
         self.assertFalse(serializer.is_valid())
         self.assertEqual(str(serializer.errors['non_field_errors']), "[ErrorDetail(string='The quantity to be restocked is more than the maximum capacity of the material stock.', code='invalid')]")
+
+class GetRestockSerializerTestCase(APITestCase):
+    def setUp(self):
+        self.user = models.User.objects.create(user_id=1)
+        self.store = factories.StoreFactory.create(user=self.user,store_name='Test Store')
+        self.material = factories.MaterialFactory.create(name='Test Material', price=10)
+        self.material_stock = factories.MaterialStockFactory.create(store=self.store, material=self.material, current_capacity=5, max_capacity=10)
+        self.url = reverse('restock')
+
+    def authenticate(self):
+        self.user = models.User.objects.get(user_id=1)
+        self.client.force_authenticate(self.user)
+
+    def test_get_restock_serializer(self):
+        self.authenticate()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['materials']), 1)
+        self.assertEqual(response.data['materials'][0]['material'], self.material.pk)
+        self.assertEqual(response.data['materials'][0]['material_name'], self.material.name)
+        self.assertEqual(response.data['materials'][0]['quantity'], 5)
+        self.assertEqual(response.data['materials'][0]['capacity'], '5/10')
+        self.assertEqual(response.data['materials'][0]['total_price'], 50.00)
