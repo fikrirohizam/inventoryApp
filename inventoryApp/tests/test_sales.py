@@ -1,10 +1,10 @@
 from django.urls import reverse
+from inventoryApp import factories, serializers
+from inventoryApp.models import User
 from rest_framework import status
 from rest_framework.test import APITestCase
-from inventoryApp.models import User
-from inventoryApp import factories
 
-class SalesTestCase(APITestCase):
+class SalesViewTestCase(APITestCase):
     url = reverse('sales')
 
     def setUp(self):
@@ -98,3 +98,59 @@ class SalesTestCase(APITestCase):
         self.assertEqual(response.data['error'], 
                          'Sales request failed due to invalid data. Please review the following list of invalid sales')
         self.assertIn(response.data['sales'][0]['non_field_errors'][0], 'Insufficient material stock')
+
+class SalesSerializerTestCase(APITestCase):
+    
+    def setUp(self):
+        self.user = User.objects.create(user_id=1)
+        self.store = factories.StoreFactory(user=self.user)
+
+        self.material1 = factories.MaterialFactory()
+        self.material2 = factories.MaterialFactory()
+        self.product1 = factories.ProductFactory()
+        self.material_quantity1 = factories.MaterialQuantityFactory(ingredient=self.material1, quantity=5)
+        self.material_stock1 = factories.MaterialStockFactory(store=self.store, material=self.material_quantity1.ingredient, current_capacity=500, max_capacity=1000)
+        
+        self.product1.material_quantity.add(self.material_quantity1)
+
+    def test_valid_data(self):
+        data = {
+            "product_id": self.product1.id,
+            "quantity": 1
+        }
+        serializer = serializers.SalesSerializer(data=data, context={"store": self.store})
+        self.assertTrue(serializer.is_valid())
+        self.assertEqual(serializer.validated_data["product_id"], self.product1.id)
+        self.assertEqual(serializer.validated_data["quantity"], 1)
+
+    def test_invalid_product_id(self):
+        data = {
+            "product_id": 999,
+            "quantity": 1
+        }
+        serializer = serializers.SalesSerializer(data=data, context={"store": self.store})
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(serializer.errors["product_id"][0], "999")
+        self.assertEqual(serializer.errors["non_field_errors"][0], "Invalid product id")
+
+    def test_insufficient_material_stock(self):
+        self.material_stock1.current_capacity = 1
+        self.material_stock1.save()
+        data = {
+            "product_id": self.product1.id,
+            "quantity": 1
+        }
+        serializer = serializers.SalesSerializer(data=data, context={"store": self.store})
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(serializer.errors["non_field_errors"][0], "Insufficient material stock")
+
+    def test_store_does_not_have_required_material(self):
+        self.material_stock1.material = self.material2
+        self.material_stock1.save()
+        data = {
+            "product_id": self.product1.id,
+            "quantity": 1
+        }
+        serializer = serializers.SalesSerializer(data=data, context={"store": self.store})
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(serializer.errors["non_field_errors"][0], "Store does not have the required material in stock")
