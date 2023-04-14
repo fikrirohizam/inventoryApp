@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.views import generic
 from django.views.decorators.csrf import csrf_exempt
-from inventoryApp import forms
+from inventoryApp import forms, models
 from inventoryApp import serializers as serializersapp
 from rest_framework import generics, serializers, status
 from rest_framework.authtoken.models import Token
@@ -15,6 +15,7 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from datetime import datetime
 
 from .authentication import expires_in, token_expire_handler
 from .models import MaterialStock, Product, Store
@@ -358,11 +359,14 @@ def sales(request):
             'message': 'Material stocks subtracted successfully',
             'updated material stocks': []
             } 
-
+        
+        date_now=datetime.now()
+        products = []
         # Loop through each product and subtract the required material from the stock
         for sale_index, sale in enumerate(serializer.validated_data):
             total_subtracted_capacity = 0
             product = get_object_or_404(Product, id=sale['product_id'])
+            products.append(product)
 
             for material_quantity in product.material_quantity.all():
                 material = material_quantity.ingredient
@@ -389,7 +393,26 @@ def sales(request):
             # Update total_subtracted_capacity to response_data after each sale
             response_data['updated material stocks'][sale_index]['total_subtracted_capacity'] = total_subtracted_capacity
 
+            # Create new sales history data after each sale
+        sales_history = models.SalesHistory.objects.create(store=current_store, date=date_now)
+        quantities = [sale['quantity'] for sale in serializer.validated_data]
+
+        for i, product in enumerate(products):
+            models.SalesHistoryProduct.objects.create(sales_history=sales_history, product=product, quantity=quantities[i])
+
         return Response(response_data, status=status.HTTP_200_OK)
+
+#----------------------- SalesHistoryView view -------------------------------
+# Get all sales history for the current store
+class SalesHistoryListAPIView(generics.ListAPIView):
+    serializer_class = serializersapp.SalesHistorySerializer
+
+    def get_queryset(self):
+        current_store = Store.objects.filter(user__username=self.request.user).first()
+        return models.SalesHistory.objects.filter(store_id=current_store).order_by('date')
+
+    
+    
 
 #===============================================================
 #                   HTML Template Views
