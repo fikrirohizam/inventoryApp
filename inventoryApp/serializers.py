@@ -159,3 +159,21 @@ class GetRestockSerializer(serializers.ModelSerializer):
     
     def get_total_price(self, obj):
         return obj.material.price * self.get_quantity(obj)
+    
+class SalesHistorySerializer(serializers.ModelSerializer):
+    products_sold = serializers.SerializerMethodField()
+
+    class Meta:
+        model = models.SalesHistory
+        fields = ['date', 'products_sold']
+
+    def get_products_sold(self, obj):
+        products = []
+        for sale_product in obj.saleshistoryproduct_set.all():
+            product_data = {
+                'product': sale_product.product.id,
+                'product_name': sale_product.product.name,
+                'quantity': sale_product.quantity
+            }
+            products.append(product_data)
+        return products
