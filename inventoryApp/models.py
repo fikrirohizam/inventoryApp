@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.forms import ValidationError
+from django.utils import timezone
 
 # Create your models here.
 class User(AbstractUser):
@@ -65,3 +66,16 @@ class MaterialStock(models.Model):
         self.clean()
         super().save(*args, **kwargs)
 
+class SalesHistory(models.Model):
+    store = models.ForeignKey(Store, on_delete=models.CASCADE)
+    products = models.ManyToManyField(Product, through='SalesHistoryProduct')
+    date = models.DateTimeField(default=timezone.now)
+    def __str__(self):
+        return f"{self.store} - {self.date}"
+    
+class SalesHistoryProduct(models.Model):
+    sales_history = models.ForeignKey(SalesHistory, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    quantity = models.IntegerField()
+    def __str__(self):
+        return f"({self.sales_history} - {self.product})"
