@@ -19,12 +19,13 @@ urlpatterns = [
     path('material-stocks/<int:pk>', views.MaterialStockDetailAPIView.as_view(), name='material_stocks_detail'),
     path('products/', views.ProductListAPIView.as_view(), name='products'),
     path('products/<int:pk>', views.ProductDeleteAPIView.as_view(), name='products_delete'),
+    path('sales-history/', views.SalesHistoryListAPIView.as_view(), name='sales_history'),
 
     #--------------------- HTML start -------------------------#
     path('login/', views.login_html_view, name='html_login'),
     path('products-list/', views.store_products, name='store_products'),
     path('products-add/', views.add_product, name='add_product'),
-    path('products-delete/<int:product_id>/', views.delete_product, name='delete_product'),
+    path('products-delete/<int:product_id>', views.delete_product, name='delete_product'),
     path('material-stock-list/', views.MaterialStockView.as_view(), name='store_stocks'),
     path('material-stock-update/<int:pk>', views.MaterialStockUpdateView.as_view(), name='update_stock'),
     path('material-stock-delete/<int:pk>', views.MaterialStockDeleteView.as_view(), name='delete_stock'),
